@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Set Visit - My Business CRM</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172554;
+        }
+
+        .header {
+            background: #172554;
+            color: white;
+            padding: 22px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 25px auto;
+            padding: 15px;
+        }
+
+        .card {
+            background: white;
+            padding: 22px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.12);
+        }
+
+        .lead-info {
+            background: #eff6ff;
+            padding: 14px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .lead-info p {
+            margin: 7px 0;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #172554;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            text-decoration: none;
+            color: #172554;
+            font-weight: bold;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+<div class="header">
+
+    <h1>📍 Set Customer Visit</h1>
+
+</div>
+
+
+<div class="container">
+
+    <div class="card">
+
+        <div class="lead-info">
+
+            <p>
+                👤 <strong>Name:</strong>
+                {{ lead['name'] or 'Name not added' }}
+            </p>
+
+            <p>
+                📞 <strong>Phone:</strong>
+                {{ lead['phone'] }}
+            </p>
+
+        </div>
+
+
+        <form method="POST">
+
+            <label>📍 Visit Date</label>
+
+            <input
+                type="date"
+                name="visit_date"
+                value="{{ lead['visit_date'] or '' }}"
+            >
+
+
+            <label>⏰ Visit Time</label>
+
+            <input
+                type="time"
+                name="visit_time"
+                value="{{ lead['visit_time'] or '' }}"
+            >
+
+
+            <button type="submit">
+                💾 Save Visit
+            </button>
+
+        </form>
+
+
+        <a
+            href="/leads"
+            class="back"
+        >
+            ← Back to Leads
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

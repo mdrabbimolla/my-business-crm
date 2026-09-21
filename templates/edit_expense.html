@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Expense</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #173b70;
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #173b70;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            color: #173b70;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>✏️ Edit Expense</h1>
+
+        <form method="POST">
+
+            <label>💰 Amount</label>
+
+            <input
+                type="number"
+                name="amount"
+                step="0.01"
+                min="0"
+                value="{{ expense['amount'] }}"
+                required
+            >
+
+            <label>📅 Expense Date</label>
+
+            <input
+                type="date"
+                name="expense_date"
+                value="{{ expense['expense_date'] or '' }}"
+                required
+            >
+
+            <label>📂 Expense Category</label>
+
+            <select name="category" required>
+
+                <option value="">Select Category</option>
+
+                <option value="Office"
+                    {% if expense['category'] == 'Office' %}selected{% endif %}>
+                    🏢 Office
+                </option>
+
+                <option value="Transport"
+                    {% if expense['category'] == 'Transport' %}selected{% endif %}>
+                    🚗 Transport
+                </option>
+
+                <option value="Marketing"
+                    {% if expense['category'] == 'Marketing' %}selected{% endif %}>
+                    📢 Marketing
+                </option>
+
+                <option value="Salary"
+                    {% if expense['category'] == 'Salary' %}selected{% endif %}>
+                    👨‍💼 Salary
+                </option>
+
+                <option value="Food"
+                    {% if expense['category'] == 'Food' %}selected{% endif %}>
+                    🍔 Food
+                </option>
+
+                <option value="Utility"
+                    {% if expense['category'] == 'Utility' %}selected{% endif %}>
+                    💡 Utility
+                </option>
+
+                <option value="Other"
+                    {% if expense['category'] == 'Other' %}selected{% endif %}>
+                    📦 Other
+                </option>
+
+            </select>
+
+            <label>📝 Description / Note</label>
+
+            <textarea
+                name="note"
+                placeholder="Write expense details..."
+            >{{ expense['note'] or '' }}</textarea>
+
+            <button type="submit">
+                💾 Update Expense
+            </button>
+
+        </form>
+
+        <a href="/expenses" class="back">
+            ⬅️ Back to Expenses
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

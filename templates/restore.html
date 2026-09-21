@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Restore Database</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            color: #173b70;
+            text-align: center;
+        }
+
+        .backup-item {
+            padding: 12px;
+            margin-top: 10px;
+            background: #f7f9fc;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        .backup-name {
+            font-weight: bold;
+            word-break: break-all;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 18px;
+            background: #777;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>📥 Restore Database</h1>
+
+    <div class="card">
+
+        <h2>💾 Available Backups</h2>
+
+        {% if backup_files %}
+
+            {% for file in backup_files %}
+
+                <div class="backup-item">
+
+                    <div class="backup-name">
+                        {{ file }}
+                    </div>
+
+<form method="POST" action="/restore"
+      onsubmit="return confirm('এই backup restore করতে চান? বর্তমান database-এর আগে একটি safety backup তৈরি হবে।');">
+
+    <input type="hidden" name="backup_file" value="{{ file }}">
+
+    <button type="submit"
+            style="margin-top:10px;
+                   padding:10px 16px;
+                   border:none;
+                   border-radius:8px;
+                   background:#173b70;
+                   color:white;
+                   font-weight:bold;">
+        🔄 Restore
+    </button>
+
+</form>
+
+                    <p>
+                        এই backup file ব্যবহার করে database restore করা যাবে।
+                    </p>
+
+                </div>
+
+            {% endfor %}
+
+        {% else %}
+
+            <p style="text-align:center; color:#777;">
+                কোনো Backup পাওয়া যায়নি।
+            </p>
+
+        {% endif %}
+
+        <a href="/dashboard" class="back-btn">
+            ⬅ Back to Dashboard
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

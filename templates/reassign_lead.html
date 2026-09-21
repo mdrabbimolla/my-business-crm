@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>Reassign Lead</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 70px auto 20px;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+        }
+
+        h2 {
+            color: #172554;
+            margin-bottom: 20px;
+        }
+
+        .info {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .info p {
+            margin: 8px 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #172554;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 8px;
+            background: #172554;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            text-decoration: none;
+            color: #172554;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+<div class="container">
+
+    <h2>🔄 Reassign Lead</h2>
+
+    <div class="info">
+
+        <p>
+            <strong>👤 Name:</strong>
+            {{ lead['name'] or 'Name not added' }}
+        </p>
+
+        <p>
+            <strong>📞 Phone:</strong>
+            {{ lead['phone'] }}
+        </p>
+
+        <p>
+            <strong>🏗️ Project:</strong>
+            {{ lead['project_name'] or 'Unassigned' }}
+        </p>
+
+        <p>
+            <strong>👤 Current Salesperson:</strong>
+            {{ lead['assigned_user_name'] or 'Unassigned' }}
+        </p>
+
+    </div>
+
+    <form method="POST">
+
+        <label>
+            👤 Assign To
+        </label>
+
+        <select name="assigned_to">
+
+            <option value="">
+                👤 Unassigned
+            </option>
+
+            {% for user in sales_users %}
+
+            <option
+                value="{{ user['username'] }}"
+                {% if lead['assigned_to'] == user['username'] %}
+                    selected
+                {% endif %}
+            >
+
+                {{ user['name'] or user['username'] }}
+
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+        <button type="submit">
+            💾 Save Assignment
+        </button>
+
+    </form>
+
+    <a class="back" href="/leads">
+        ← Back to Leads
+    </a>
+
+</div>
+
+</body>
+</html>

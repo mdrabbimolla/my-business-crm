@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Leads - My Business CRM</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172554;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 20px;
+            border-bottom: 4px solid #d4af37;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .container {
+            padding: 15px;
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .top-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            display: block;
+            text-decoration: none;
+            text-align: center;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            flex: 1;
+        }
+
+        .add-btn {
+            background: #15803d;
+            color: white;
+        }
+
+        .back-btn {
+            background: white;
+            color: #172554;
+            border: 1px solid #cbd5e1;
+        }
+
+        .search-box {
+            background: white;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+        }
+
+        .search-box form {
+            display: flex;
+            gap: 8px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        .search-box button {
+            background: #172554;
+            color: white;
+            border: none;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .lead-card {
+            background: white;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .lead-name {
+            font-size: 19px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .info {
+            margin: 6px 0;
+            font-size: 14px;
+        }
+
+        .status {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .action-btn {
+            flex: 1;
+            text-decoration: none;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .call {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .whatsapp {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .empty {
+            background: white;
+            padding: 25px;
+            text-align: center;
+            border-radius: 12px;
+            color: #64748b;
+        }
+/* =========================
+   PC / DESKTOP LEADS
+   ========================= */
+
+@media (min-width: 900px) {
+
+    body {
+        background: #eef2f7;
+    }
+
+    .header {
+        padding: 28px 45px;
+    }
+
+    .header h1 {
+        font-size: 30px;
+    }
+
+    .container {
+        max-width: 1500px;
+        margin: 0 auto;
+        padding: 30px 35px;
+    }
+
+    .top-buttons {
+        max-width: 500px;
+    }
+
+    .search-box {
+        padding: 16px;
+    }
+
+    /* 5 Lead Cards Per Row */
+
+    .container {
+        display: block;
+    }
+
+    .lead-card {
+        padding: 18px;
+        margin-bottom: 0;
+        border-radius: 15px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        transition: transform 0.2s ease,
+                    box-shadow 0.2s ease;
+    }
+
+    .lead-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    }
+
+    /*
+       Make only the lead cards into
+       a 5-column PC grid
+    */
+
+    .lead-card {
+        display: inline-block;
+        vertical-align: top;
+        width: calc(20% - 15px);
+        margin-right: 14px;
+        margin-bottom: 18px;
+    }
+
+    .lead-card:nth-of-type(5n) {
+        margin-right: 0;
+    }
+
+    .lead-name {
+        font-size: 18px;
+    }
+
+    .info {
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+    }
+
+    .action-btn {
+        padding: 10px 5px;
+        font-size: 12px;
+    }
+
+}
+    </style>
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+    <div class="header">
+        <h1>📋 Leads</h1>
+    </div>
+
+    <div class="container">
+
+        <div class="top-buttons">
+            <a href="/add-lead" class="btn add-btn">
+                ➕ Add Lead
+            </a>
+
+            <a href="/dashboard" class="btn back-btn">
+                ← Dashboard
+            </a>
+        </div>
+
+        <div class="search-box">
+            <form method="GET" action="/leads">
+
+                <input
+                    type="text"
+                    name="search"
+                    placeholder="Search name or phone..."
+                    value="{{ search }}"
+                >
+
+                <button type="submit">
+                    🔎 Search
+                </button>
+
+            </form>
+        </div>
+
+        {% if leads %}
+
+            {% for lead in leads %}
+
+                <div class="lead-card">
+
+                    <div class="lead-name">
+                        👤 {{ lead['name'] or 'Name not added' }}
+                    </div>
+
+                    <div class="info">
+                        📞 <strong>Phone:</strong>
+                        {{ lead['phone'] }}
+                    </div>
+
+                    <div class="info">
+                        🏗️ <strong>Project:</strong>
+                        {{ lead['project_name'] or 'Unassigned' }}
+                    </div>
+
+                    <div class="info">
+                        👤 <strong>Assigned To:</strong>
+                        {{ lead['assigned_user_name'] or 'Unassigned' }}
+                    </div>
+
+                    <div class="info">
+                        📅 <strong>Follow-up:</strong>
+                        {{ lead['follow_up_date'] or 'Not set' }}
+                    </div>
+
+<div class="info">
+    📍 <strong>Visit Date:</strong>
+    {{ lead['visit_date'] or 'Not set' }}
+</div>
+
+<div class="info">
+    ⏰ <strong>Visit Time:</strong>
+    {{ lead['visit_time'] or 'Not set' }}
+</div>
+
+                    <div class="info">
+                        📌 <strong>Status:</strong>
+                        <span class="status">
+                            {{ lead['status'] }}
+                        </span>
+                    </div>
+
+                    {% if lead['notes'] %}
+                        <div class="info">
+                            📝 <strong>Notes:</strong>
+                            {{ lead['notes'] }}
+                        </div>
+                    {% endif %}
+
+                    <div class="actions">
+
+                        <a
+                            href="tel:{{ lead['phone'] }}"
+                            class="action-btn call"
+                        >
+                            📞 Call
+                        </a>
+
+                        <a
+                            href="https://wa.me/{{ lead['phone'] }}"
+                            class="action-btn whatsapp"
+                        >
+                            💬 WhatsApp
+                        </a>
+
+<a
+    href="/set-visit/{{ lead['id'] }}"
+    class="action-btn"
+>
+    📍 Set Visit
+</a>
+
+{% if session.get("username") == "admin" %}
+    <a href="/reassign-lead/{{ lead['id'] }}">
+        🔄 Reassign
+    </a>
+{% endif %}
+
+                    </div>
+
+                </div>
+
+            {% endfor %}
+
+        {% else %}
+
+            <div class="empty">
+                📭 No leads found.
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</body>
+</html>

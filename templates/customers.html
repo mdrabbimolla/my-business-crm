@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Customers - My Business CRM</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        /* =========================
+           HEADER
+           ========================= */
+
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 20px;
+            border-bottom: 3px solid #d4af37;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 23px;
+        }
+
+        /* =========================
+           MAIN CONTAINER
+           ========================= */
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        /* =========================
+           FILTER BUTTONS
+           ========================= */
+
+        .filter-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .filter-buttons a {
+            padding: 9px 14px;
+            color: white;
+            text-decoration: none;
+            border-radius: 7px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .all-btn {
+            background: #172554;
+        }
+
+        .due-btn {
+            background: #dc3545;
+        }
+
+        .paid-btn {
+            background: #198754;
+        }
+
+        .export-btn {
+            background: #173b70;
+        }
+
+        /* =========================
+           SEARCH
+           ========================= */
+
+        .search {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 15px;
+            margin-bottom: 8px;
+        }
+
+        .search-button {
+            width: 100%;
+            margin-top: 8px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: #172554;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        /* =========================
+           PROJECT FILTER
+           ========================= */
+
+        .project-filter {
+            margin-bottom: 15px;
+        }
+
+        .project-filter label {
+            font-weight: bold;
+        }
+
+        .project-filter select {
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        /* =========================
+           CUSTOMER LIST
+           ========================= */
+
+        #customerList {
+            display: block;
+        }
+
+        /* =========================
+           CUSTOMER CARD
+           ========================= */
+
+        .customer {
+            background: white;
+            padding: 17px;
+            border-radius: 14px;
+            margin-bottom: 12px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            border: 1px solid #eef1f5;
+        }
+
+        .customer h3 {
+            margin: 0 0 8px;
+            color: #172554;
+        }
+
+        .customer p {
+            margin: 6px 0;
+            color: #555;
+        }
+
+        .project-name {
+            margin-top: 8px !important;
+            padding: 8px;
+            background: #eff6ff;
+            color: #172554 !important;
+            border-radius: 7px;
+            font-weight: bold;
+        }
+
+        .due {
+            margin-top: 10px !important;
+            padding: 10px;
+            background: #fee2e2;
+            color: #b91c1c !important;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        /* =========================
+           CUSTOMER BUTTONS
+           ========================= */
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 14px;
+        }
+
+        .buttons a {
+            text-align: center;
+            text-decoration: none;
+            padding: 11px 5px;
+            border-radius: 8px;
+            background: #172554;
+            color: white;
+            font-size: 13px;
+        }
+
+        .buttons .delete {
+            background: #b91c1c;
+        }
+
+        .buttons .whatsapp {
+            background: #15803d;
+        }
+
+        /* =========================
+           BACK BUTTON
+           ========================= */
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+            text-decoration: none;
+            color: #172554;
+            font-weight: bold;
+        }
+
+        /* ==================================================
+           PC / DESKTOP VERSION
+           ================================================== */
+
+        @media (min-width: 900px) {
+
+            body {
+                background: #eef2f7;
+            }
+
+            .header {
+                padding: 28px 45px;
+            }
+
+            .header h1 {
+                font-size: 30px;
+            }
+
+            .container {
+                max-width: 1500px;
+                margin: 0 auto;
+                padding: 30px 35px;
+            }
+
+            /* PC filter area */
+
+            .filter-buttons {
+                gap: 10px;
+            }
+
+            .filter-buttons a {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+
+            /* PC search */
+
+            .search {
+                padding: 15px;
+                font-size: 15px;
+            }
+
+            .search-button {
+                padding: 13px;
+            }
+
+            /* PC project filter */
+
+            .project-filter select {
+                padding: 13px;
+            }
+
+            /* ==========================================
+               PC CUSTOMER GRID
+               5 CARDS PER ROW
+               ========================================== */
+
+            #customerList {
+                display: grid;
+                grid-template-columns: repeat(5, minmax(0, 1fr));
+                gap: 18px;
+                align-items: start;
+            }
+
+            .customer {
+                margin-bottom: 0;
+                padding: 18px;
+                border-radius: 15px;
+                box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+                border: 1px solid #e2e8f0;
+                transition: transform 0.2s ease,
+                            box-shadow 0.2s ease;
+            }
+
+            .customer:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+            }
+
+            .customer h3 {
+                font-size: 18px;
+            }
+
+            .customer p {
+                font-size: 13px;
+            }
+
+            .project-name {
+                font-size: 13px;
+            }
+
+            .due {
+                font-size: 14px;
+            }
+
+            .buttons {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+
+            .buttons a {
+                padding: 11px 4px;
+                font-size: 12px;
+            }
+
+            .back {
+                margin-top: 30px;
+            }
+
+        }
+
+        /* ==================================================
+           VERY LARGE SCREEN
+           ================================================== */
+
+        @media (min-width: 1600px) {
+
+            .container {
+                max-width: 1600px;
+            }
+
+            #customerList {
+                gap: 20px;
+            }
+
+            .customer {
+                padding: 20px;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+<!-- HEADER -->
+
+<div class="header">
+
+    <h1>👥 Customers</h1>
+
+</div>
+
+<!-- MAIN -->
+
+<div class="container">
+
+    <!-- FILTER BUTTONS -->
+
+    <div class="filter-buttons">
+
+        <a href="/customers"
+           class="all-btn">
+            👥 All
+        </a>
+
+        <a href="/customers?filter=due"
+           class="due-btn">
+            🔴 Due Customers
+        </a>
+
+        <a href="/customers?filter=paid"
+           class="paid-btn">
+            ✅ Fully Paid
+        </a>
+
+        <a href="/export-customers"
+           class="export-btn">
+            📥 Export Customers
+        </a>
+
+    </div>
+
+    <!-- PROJECT FILTER -->
+
+    <div class="project-filter">
+
+        <label>
+            🏗️ Filter by Project
+        </label>
+
+        <select name="project_id"
+                onchange="this.form.submit()"
+                form="customerSearchForm">
+
+            <option value="">
+                🏗️ All Projects
+            </option>
+
+            {% for project in projects %}
+
+            <option value="{{ project['id'] }}"
+                {% if project_filter == project['id']|string %}
+                    selected
+                {% endif %}>
+
+                {{ project['name'] }}
+
+            </option>
+
+            {% endfor %}
+
+        </select>
+
+    </div>
+
+    <!-- SEARCH -->
+
+    <form id="customerSearchForm"
+          method="GET"
+          action="/customers"
+          style="margin-bottom:15px;">
+
+        <input
+            class="search"
+            type="text"
+            name="search"
+            placeholder="Search Name / Phone / Business / Address..."
+            value="{{ search }}"
+        >
+
+        <button
+            type="submit"
+            class="search-button">
+
+            🔍 Search
+
+        </button>
+
+    </form>
+
+    <!-- CUSTOMER LIST -->
+
+    <div id="customerList">
+
+        {% for customer in customers %}
+
+        <div class="customer">
+
+            <h3>
+                {{ customer['name'] }}
+            </h3>
+
+            <p>
+                📞 {{ customer['phone'] }}
+            </p>
+
+            <p>
+                🏠 {{ customer['address'] }}
+            </p>
+
+            <p>
+                💼 {{ customer['business'] }}
+            </p>
+
+            <p class="project-name">
+
+                🏗️ Project:
+
+                {{ customer['project_name'] or 'Unassigned' }}
+
+            </p>
+
+            <p>
+                💰 Sales:
+                ৳{{ customer['sales'] }}
+            </p>
+
+            <p>
+                💵 Paid:
+                ৳{{ customer['paid'] }}
+            </p>
+
+            <p class="due">
+
+                🔴 Due:
+
+                ৳{{ customer['sales'] - customer['paid'] }}
+
+            </p>
+
+            <!-- ACTION BUTTONS -->
+
+            <div class="buttons">
+
+                <a href="/customer/{{ customer['id'] }}">
+                    👤 Profile
+                </a>
+
+                <a href="/edit-customer/{{ customer['id'] }}">
+                    ✏️ Edit
+                </a>
+
+                <a
+                    class="delete"
+                    href="/delete-customer/{{ customer['id'] }}"
+                    onclick="return confirm('Are you sure you want to delete this customer?')"
+                >
+                    🗑️ Delete
+                </a>
+
+                <a href="tel:{{ customer['phone'] }}">
+                    📞 Call
+                </a>
+
+                <a
+                    class="whatsapp"
+                    href="https://wa.me/88{{ customer['phone'] }}"
+                    target="_blank"
+                >
+                    💬 WhatsApp
+                </a>
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    </div>
+
+    <!-- BACK -->
+
+    <a class="back"
+       href="/dashboard">
+
+        ← Back to Dashboard
+
+    </a>
+
+</div>
+
+<script>
+
+function searchCustomers() {
+
+    let input =
+        document.getElementById("search")
+        ?.value
+        .toLowerCase();
+
+    if (!input) {
+        return;
+    }
+
+    let customers =
+        document.querySelectorAll(".customer");
+
+    customers.forEach(function(customer) {
+
+        let text =
+            customer.innerText.toLowerCase();
+
+        if (text.includes(input)) {
+
+            customer.style.display = "block";
+
+        } else {
+
+            customer.style.display = "none";
+
+        }
+
+    });
+
+}
+
+</script>
+
+</body>
+
+</html>

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Users - My Business CRM</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172554;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 20px;
+            border-bottom: 4px solid #d4af37;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .container {
+            padding: 15px;
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .top-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            flex: 1;
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            padding: 12px;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .add-btn {
+            background: #15803d;
+            color: white;
+        }
+
+        .back-btn {
+            background: white;
+            color: #172554;
+            border: 1px solid #cbd5e1;
+        }
+
+        .user-card {
+            background: white;
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .username {
+            font-size: 19px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .info {
+            margin: 7px 0;
+            font-size: 14px;
+        }
+
+        .role {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .active {
+            display: inline-block;
+            background: #dcfce7;
+            color: #15803d;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .inactive {
+            display: inline-block;
+            background: #fee2e2;
+            color: #b91c1c;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+    <div class="header">
+        <h1>👥 CRM Users</h1>
+    </div>
+
+    <div class="container">
+
+        <div class="top-buttons">
+
+            <a href="/add-user" class="btn add-btn">
+                ➕ Add User
+            </a>
+
+            <a href="/dashboard" class="btn back-btn">
+                ← Dashboard
+            </a>
+
+        </div>
+
+        {% if users %}
+
+            {% for user in users %}
+
+                <div class="user-card">
+
+                    <div class="username">
+                        👤 {{ user['name'] or user['username'] }}
+                    </div>
+
+                    <div class="info">
+                        🔑 <strong>Username:</strong>
+                        {{ user['username'] }}
+                    </div>
+
+                    <div class="info">
+                        🛡️ <strong>Role:</strong>
+
+                        <span class="role">
+                            {{ user['role'] or 'Sales' }}
+                        </span>
+                    </div>
+
+                    <div class="info">
+                        📌 <strong>Status:</strong>
+
+                        {% if user['active'] == 1 %}
+
+                            <span class="active">
+                                Active
+                            </span>
+
+                        {% else %}
+
+                            <span class="inactive">
+                                Inactive
+                            </span>
+
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+            {% endfor %}
+
+        {% else %}
+
+            <div class="user-card">
+                No users found.
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</body>
+</html>

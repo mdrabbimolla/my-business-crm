@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Daily Follow-up</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f4f6f8;
+    font-family: Arial, sans-serif;
+}
+
+.header {
+    background: #173b70;
+    color: white;
+    padding: 20px;
+}
+
+.header h2 {
+    margin: 0;
+}
+
+.container {
+    max-width: 800px;
+    margin: 25px auto;
+    padding: 15px;
+}
+
+.top-button {
+    display: block;
+    background: #173b70;
+    color: white;
+    text-align: center;
+    padding: 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    background: white;
+    padding: 14px;
+    border-radius: 10px;
+    margin-top: 25px;
+    margin-bottom: 15px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.card {
+    background: white;
+    padding: 18px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+}
+
+.name {
+    font-size: 20px;
+    font-weight: bold;
+    color: #173b70;
+}
+
+.info {
+    margin-top: 8px;
+    line-height: 1.7;
+}
+
+.status {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #fff3cd;
+    color: #856404;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.status-number-off {
+    background: #f8d7da;
+    color: #842029;
+}
+
+.status-not-received {
+    background: #ffe5c2;
+    color: #9a5b00;
+}
+
+.status-positive {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+
+.status-cancel {
+    background: #e2e3e5;
+    color: #41464b;
+}
+
+.buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.call,
+.whatsapp {
+    flex: 1;
+    padding: 11px;
+    border-radius: 8px;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+    font-weight: bold;
+}
+
+.call {
+    background: #198754;
+}
+
+.whatsapp {
+    background: #25D366;
+}
+
+.edit-button {
+    display: block;
+    margin-top: 15px;
+    padding: 11px;
+    background: #173b70;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.delete-button {
+    display: block;
+    margin-top: 10px;
+    padding: 11px;
+    background: #dc3545;
+    color: white;
+    text-align: center;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.empty {
+    background: white;
+    padding: 25px;
+    text-align: center;
+    border-radius: 15px;
+    color: #777;
+    margin-bottom: 15px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+<div class="header">
+    <h2>📅 Daily Follow-up</h2>
+</div>
+
+<div class="container">
+
+<input
+    type="text"
+    id="followupSearch"
+    placeholder="🔎 নাম বা ফোন দিয়ে খুঁজুন..."
+    onkeyup="searchFollowups()"
+    style="width:100%;
+           padding:14px;
+           border:1px solid #ddd;
+           border-radius:10px;
+           margin-bottom:20px;
+           font-size:16px;"
+>
+
+<div style="display:flex;
+            gap:8px;
+            flex-wrap:wrap;
+            margin-bottom:20px;">
+
+    <button onclick="filterStatus('all')"
+            style="padding:10px 14px;
+                   border:none;
+                   border-radius:8px;
+                   background:#173b70;
+                   color:white;">
+        📋 All
+    </button>
+
+    <button onclick="filterStatus('Number Off')"
+            style="padding:10px 14px;
+                   border:none;
+                   border-radius:8px;
+                   background:#f8d7da;
+                   color:#842029;">
+        📵 Number Off
+    </button>
+
+    <button onclick="filterStatus('Not Received')"
+            style="padding:10px 14px;
+                   border:none;
+                   border-radius:8px;
+                   background:#ffe5c2;
+                   color:#9a5b00;">
+        📞 Not Received
+    </button>
+
+    <button onclick="filterStatus('Positive')"
+            style="padding:10px 14px;
+                   border:none;
+                   border-radius:8px;
+                   background:#d1e7dd;
+                   color:#0f5132;">
+        😊 Positive
+    </button>
+
+    <button onclick="filterStatus('Cancel')"
+            style="padding:10px 14px;
+                   border:none;
+                   border-radius:8px;
+                   background:#e2e3e5;
+                   color:#41464b;">
+        ❌ Cancel
+    </button>
+
+<div style="margin:15px 0; display:flex; gap:8px; flex-wrap:wrap;">
+
+    <a href="/followups?date_filter=today"
+       style="padding:8px 14px; background:#173b70; color:white; text-decoration:none; border-radius:6px;">
+        📅 Today
+    </a>
+
+    <a href="/followups?date_filter=upcoming"
+       style="padding:8px 14px; background:#198754; color:white; text-decoration:none; border-radius:6px;">
+        ⏰ Upcoming
+    </a>
+
+    <a href="/followups?date_filter=missed"
+       style="padding:8px 14px; background:#dc3545; color:white; text-decoration:none; border-radius:6px;">
+        🚨 Missed
+    </a>
+
+    <a href="/followups"
+       style="padding:8px 14px; background:#6c757d; color:white; text-decoration:none; border-radius:6px;">
+        🔄 All Dates
+    </a>
+
+</div>
+</div>
+
+<a href="/add-followup" class="top-button">
+    ➕ ADD FOLLOW-UP
+</a>
+
+
+<!-- TODAY -->
+
+<div class="section-title">
+    📅 আজকের Follow-up
+    ({{ today_followups|length }})
+</div>
+
+{% if today_followups %}
+
+    {% for followup in today_followups %}
+
+    <div class="card">
+
+        <div class="name">
+            {{ followup['name'] }}
+        </div>
+
+        <div class="info">
+
+            📞 <strong>Phone:</strong>
+            {{ followup['phone'] or 'Not provided' }}
+
+            <br>
+
+            📅 <strong>Follow-up Date:</strong>
+            {{ followup['follow_up_date'] or 'Not set' }}
+
+            <br>
+
+            📝 <strong>Note:</strong>
+            {{ followup['note'] or 'No note' }}
+
+            <br><br>
+
+            <span class="status
+            {% if followup['status'] == 'Number Off' %}
+                status-number-off
+            {% elif followup['status'] == 'Not Received' %}
+                status-not-received
+            {% elif followup['status'] == 'Positive' %}
+                status-positive
+            {% elif followup['status'] == 'Cancel' %}
+                status-cancel
+            {% endif %}
+            ">
+                {{ followup['status'] }}
+            </span>
+
+        </div>
+
+        <a href="/edit-followup/{{ followup['id'] }}"
+           class="edit-button">
+            ✏️ Edit Follow-up
+        </a>
+
+        <a href="/delete-followup/{{ followup['id'] }}"
+           onclick="return confirm('এই Follow-up টি কি delete করতে চান?');"
+           class="delete-button">
+            🗑️ Delete Follow-up
+        </a>
+
+        {% if followup['phone'] %}
+
+<div class="buttons"
+     style="display:flex;
+            gap:8px;
+            margin-top:10px;">
+
+    <a href="tel:{{ followup['phone'] }}"
+       class="call"
+       style="flex:1;
+              text-align:center;
+              padding:11px 8px;
+              border-radius:8px;
+              text-decoration:none;
+              font-weight:bold;">
+        📞 Call
+    </a>
+
+    <a href="https://wa.me/880{{ followup['phone'][1:] }}"
+       class="whatsapp"
+       target="_blank"
+       style="flex:1;
+              text-align:center;
+              padding:11px 8px;
+              border-radius:8px;
+              text-decoration:none;
+              font-weight:bold;">
+        💬 WhatsApp
+    </a>
+
+</div>
+        {% endif %}
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<div class="empty">
+    📭 আজকের কোনো Follow-up নেই।
+</div>
+
+{% endif %}
+
+
+<!-- UPCOMING -->
+
+<div class="section-title">
+    🔜 আগামী দিনের Follow-up
+    ({{ upcoming_followups|length }})
+</div>
+
+{% if upcoming_followups %}
+
+    {% for followup in upcoming_followups %}
+
+    <div class="card">
+
+        <div class="name">
+            {{ followup['name'] }}
+        </div>
+
+        <div class="info">
+
+            📞 <strong>Phone:</strong>
+            {{ followup['phone'] or 'Not provided' }}
+
+            <br>
+
+            📅 <strong>Follow-up Date:</strong>
+            {{ followup['follow_up_date'] or 'Not set' }}
+
+            <br>
+
+            📝 <strong>Note:</strong>
+            {{ followup['note'] or 'No note' }}
+
+            <br><br>
+
+            <span class="status
+            {% if followup['status'] == 'Number Off' %}
+                status-number-off
+            {% elif followup['status'] == 'Not Received' %}
+                status-not-received
+            {% elif followup['status'] == 'Positive' %}
+                status-positive
+            {% elif followup['status'] == 'Cancel' %}
+                status-cancel
+            {% endif %}
+            ">
+                {{ followup['status'] }}
+            </span>
+
+        </div>
+
+        <a href="/edit-followup/{{ followup['id'] }}"
+           class="edit-button">
+            ✏️ Edit Follow-up
+        </a>
+
+        <a href="/delete-followup/{{ followup['id'] }}"
+           onclick="return confirm('এই Follow-up টি কি delete করতে চান?');"
+           class="delete-button">
+            🗑️ Delete Follow-up
+        </a>
+
+        {% if followup['phone'] %}
+
+        <div class="buttons">
+
+            <a href="tel:{{ followup['phone'] }}"
+               class="call">
+                📞 Call
+            </a>
+
+            <a href="https://wa.me/88{{ followup['phone'] }}"
+               class="whatsapp"
+               target="_blank">
+                💬 WhatsApp
+            </a>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<div class="empty">
+    📭 আগামী দিনের কোনো Follow-up নেই।
+</div>
+
+{% endif %}
+
+
+<!-- OLD -->
+
+<div class="section-title">
+    ⏰ পুরোনো / Missed Follow-up
+    ({{ old_followups|length }})
+</div>
+
+{% if old_followups %}
+
+    {% for followup in old_followups %}
+
+    <div class="card">
+
+        <div class="name">
+            {{ followup['name'] }}
+        </div>
+
+        <div class="info">
+
+            📞 <strong>Phone:</strong>
+            {{ followup['phone'] or 'Not provided' }}
+
+            <br>
+
+            📅 <strong>Follow-up Date:</strong>
+            {{ followup['follow_up_date'] or 'Not set' }}
+
+            <br>
+
+            📝 <strong>Note:</strong>
+            {{ followup['note'] or 'No note' }}
+
+            <br><br>
+
+            <span class="status
+            {% if followup['status'] == 'Number Off' %}
+                status-number-off
+            {% elif followup['status'] == 'Not Received' %}
+                status-not-received
+            {% elif followup['status'] == 'Positive' %}
+                status-positive
+            {% elif followup['status'] == 'Cancel' %}
+                status-cancel
+            {% endif %}
+            ">
+                {{ followup['status'] }}
+            </span>
+
+        </div>
+
+        <a href="/edit-followup/{{ followup['id'] }}"
+           class="edit-button">
+            ✏️ Edit Follow-up
+        </a>
+
+        <a href="/delete-followup/{{ followup['id'] }}"
+           onclick="return confirm('এই Follow-up টি কি delete করতে চান?');"
+           class="delete-button">
+            🗑️ Delete Follow-up
+        </a>
+
+        {% if followup['phone'] %}
+
+        <div class="buttons">
+
+            <a href="tel:{{ followup['phone'] }}"
+               class="call">
+                📞 Call
+            </a>
+
+            <a href="https://wa.me/88{{ followup['phone'] }}"
+               class="whatsapp"
+               target="_blank">
+                💬 WhatsApp
+            </a>
+
+        </div>
+
+        {% endif %}
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<div class="empty">
+    📭 কোনো পুরোনো Follow-up নেই।
+</div>
+
+{% endif %}
+
+</div>
+
+
+<script>
+
+let activeStatus = "all";
+
+function applyFollowupFilters() {
+
+    let input = document.getElementById("followupSearch");
+    let searchText = input.value.toLowerCase().trim();
+
+    let cards = document.querySelectorAll(".card");
+
+    cards.forEach(function(card) {
+
+        let cardText = card.innerText.toLowerCase();
+
+        let statusElement = card.querySelector(".status");
+
+        let cardStatus = "";
+
+        if (statusElement) {
+            cardStatus = statusElement.innerText.trim();
+        }
+
+        let matchesSearch = cardText.includes(searchText);
+
+        let matchesStatus =
+            activeStatus === "all" ||
+            cardStatus === activeStatus;
+
+        if (matchesSearch && matchesStatus) {
+            card.style.display = "";
+        } else {
+            card.style.display = "none";
+        }
+
+    });
+
+}
+
+
+function searchFollowups() {
+
+    applyFollowupFilters();
+
+}
+
+
+function filterStatus(status) {
+
+    activeStatus = status;
+
+    applyFollowupFilters();
+
+}
+</script>
+
+</body>
+</html>

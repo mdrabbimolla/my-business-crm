@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Receipt Options</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6f8;
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            background: #173b70;
+            color: white;
+            padding: 20px;
+        }
+
+        .header h2 {
+            margin: 0;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        .customer {
+            margin-bottom: 20px;
+        }
+
+        .customer strong {
+            font-size: 20px;
+        }
+
+        .option {
+            background: #f8fafc;
+            padding: 18px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+
+        .option label {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 17px;
+            font-weight: bold;
+        }
+
+        .option input {
+            width: 22px;
+            height: 22px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 25px;
+            padding: 14px;
+            border: none;
+            border-radius: 9px;
+            background: #173b70;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="header">
+        <h2>🧾 Receipt Options</h2>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+
+            <div class="customer">
+
+                <strong>
+                    {{ customer['name'] }}
+                </strong>
+
+                <br>
+
+                Payment:
+                ৳{{ "%.2f"|format(payment['amount']) }}
+
+            </div>
+
+
+            <form method="GET"
+                  action="/payment-receipt/{{ payment['id'] }}">
+
+                <div class="option">
+
+                    <label>
+
+                        <input
+                            type="checkbox"
+                            name="show_due"
+                            value="1">
+
+                        Show Due Payment on Receipt
+
+                    </label>
+
+                </div>
+
+
+                <button type="submit">
+
+                    🧾 Generate Receipt
+
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

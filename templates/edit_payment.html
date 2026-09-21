@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Payment</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        .header {
+            background: #172554;
+            color: white;
+            padding: 22px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            border: none;
+            border-radius: 9px;
+            background: #172554;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            text-decoration: none;
+            color: #172554;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+    <h1>✏️ Edit Payment</h1>
+
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <form method="POST">
+
+            <label>Payment Amount</label>
+
+            <input
+                type="number"
+                name="amount"
+                value="{{ payment['amount'] }}"
+                step="0.01"
+                required
+            >
+
+            <label>Payment Date</label>
+
+            <input
+                type="date"
+                name="payment_date"
+                value="{{ payment['payment_date'] }}"
+                required
+            >
+
+            <label>Note</label>
+
+            <textarea
+                name="note"
+                placeholder="Payment note"
+            >{{ payment['note'] or '' }}</textarea>
+
+            <button type="submit">
+                💾 Update Payment
+            </button>
+
+        </form>
+
+        <a class="back"
+           href="/customer/{{ payment['customer_id'] }}">
+            ← Back to Customer
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

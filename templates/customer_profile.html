@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Customer Profile</title>
+
+    <style>
+        .payment-history {
+            margin-top: 25px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .payment-history h3 {
+            margin-top: 0;
+            color: #172554;
+        }
+
+        .payment-item {
+            background: white;
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 9px;
+            border-left: 4px solid #172554;
+        }
+
+        .payment-date {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .payment-note {
+            font-size: 14px;
+            margin-top: 5px;
+            color: #444;
+        }
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        .header {
+            background: #172554;
+            color: white;
+            padding: 22px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 23px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        .profile {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        .profile h2 {
+            margin-top: 0;
+            color: #172554;
+        }
+
+        .info {
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .label {
+            font-size: 13px;
+            color: #777;
+        }
+
+        .value {
+            margin-top: 4px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .due {
+            color: #b91c1c;
+        }
+
+        .buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .buttons a {
+            padding: 13px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 9px;
+            background: #172554;
+            color: white;
+        }
+
+        .whatsapp {
+            background: #15803d !important;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 18px;
+            text-decoration: none;
+            color: #172554;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="header">
+
+    <h1>👤 Customer Profile</h1>
+
+</div>
+
+
+<div class="container">
+
+    <div class="profile">
+
+        <h2>
+            {{ customer['name'] }}
+        </h2>
+
+
+        <div class="info">
+
+            <div class="label">
+                📞 Phone
+            </div>
+
+            <div class="value">
+                {{ customer['phone'] }}
+            </div>
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="label">
+                🏠 Address
+            </div>
+
+            <div class="value">
+                {{ customer['address'] }}
+            </div>
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="label">
+                💼 Business / Profession
+            </div>
+
+            <div class="value">
+                {{ customer['business'] }}
+            </div>
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="label">
+                💰 Total Sales
+            </div>
+
+            <div class="value">
+                ৳{{ customer['sales'] }}
+            </div>
+
+        </div>
+
+<div class="info">
+
+    <div class="label">
+        🏗️ Project
+    </div>
+
+    <div class="value">
+        {{ customer['project_name'] or 'Unassigned' }}
+    </div>
+
+</div>
+
+        <div class="info">
+
+            <div class="label">
+                💵 Paid
+            </div>
+
+            <div class="value">
+                ৳{{ customer['paid'] }}
+            </div>
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="label">
+                🔴 Due
+            </div>
+
+            <div class="value due">
+                ৳{{ due }}
+            </div>
+
+        </div>
+
+        <div class="info">
+
+            <div class="label">
+                💳 Total Payments
+            </div>
+
+            <div class="value">
+                {{ payments|length }} বার
+            </div>
+
+        </div>
+
+
+        </div>
+
+
+        <div class="info">
+
+            <div class="label">
+                📝 Notes
+            </div>
+
+            <div class="value">
+                {{ customer['notes'] }}
+            </div>
+
+        </div>
+
+        <div class="payment-history">
+
+            <h3>💳 Payment History</h3>
+
+            {% if payments %}
+
+                {% for payment in payments %}
+                    
+<div class="payment-item">
+
+                        <div>
+                            <strong>৳{{ payment['amount'] }}</strong>
+                        </div>
+
+<div style="margin-top:5px; color:#555;">
+    💰 Due After Payment: ৳{{ payment['due_after_payment'] }}
+</div>
+
+                        <div class="payment-date">
+                            📅 {{ payment['payment_date'] }}
+                        </div>
+<a href="/edit-payment/{{ payment['id'] }}">
+    ✏️ Edit
+</a>
+<a href="/receipt-options/{{ payment['id'] }}"
+   target="_blank">
+    🧾 Receipt
+</a>
+<a href="/delete-payment/{{ payment['id'] }}"
+   onclick="return confirm('Are you sure you want to delete this payment?');">
+    🗑️ Delete
+</a>
+                        {% if payment['note'] %}
+                            <div class="payment-note">
+                                📝 {{ payment['note'] }}
+                            </div>
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p>No payment history yet.</p>
+
+            {% endif %}
+
+        </div>
+        <div class="buttons">
+
+            <a href="tel:{{ customer['phone'] }}">
+                📞 Call
+            </a>
+
+            <a
+                class="whatsapp"
+                href="https://wa.me/88{{ customer['phone'] }}"
+                target="_blank"
+            >
+                💬 WhatsApp
+            </a>
+
+            <a href="/edit-customer/{{ customer['id'] }}">
+                ✏️ Edit
+            </a>
+<a href="/add-payment/{{ customer['id'] }}">
+    ➕ Add Payment
+</a>
+        </div>
+
+
+        <a class="back" href="/customers">
+            ← Back to Customers
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Expenses</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .header {
+            background: #173b70;
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+        }
+
+        .total {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .total h2 {
+            margin: 0;
+            color: #c62828;
+        }
+
+        .expense-card {
+            background: white;
+            padding: 18px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .amount {
+            font-size: 20px;
+            font-weight: bold;
+            color: #c62828;
+        }
+
+        .category {
+            display: inline-block;
+            background: #eef3f9;
+            color: #173b70;
+            padding: 5px 10px;
+            border-radius: 20px;
+            margin-top: 8px;
+        }
+
+        .buttons {
+            margin-top: 12px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 9px 14px;
+            border-radius: 7px;
+            text-decoration: none;
+            color: white;
+            margin-right: 6px;
+            font-size: 14px;
+        }
+
+        .add {
+            background: #198754;
+        }
+
+        .back {
+            background: #777;
+        }
+    </style>
+</head>
+
+<body>
+
+{% include "menu.html" %}
+
+<div class="container">
+
+    <div class="header">
+        <h1>💸 Expense Management</h1>
+        <p>Manage your business expenses</p>
+    </div>
+
+    <div class="total">
+        <p style="margin:0 0 8px;">Total Expenses</p>
+
+        <h2>
+            ৳{{ "%.2f"|format(total_expenses or 0) }}
+        </h2>
+    </div>
+
+    <div style="margin-bottom:20px;">
+
+        <a href="/add-expense" class="btn add">
+            ➕ Add Expense
+        </a>
+
+        <a href="/dashboard" class="btn back">
+            ⬅️ Dashboard
+        </a>
+
+    </div>
+
+    {% if expenses %}
+
+        {% for expense in expenses %}
+
+        <div class="expense-card">
+
+            <div class="amount">
+                💸 ৳{{ "%.2f"|format(expense["amount"] or 0) }}
+            </div>
+
+            <div class="category">
+                📂 {{ expense["category"] or "Other" }}
+            </div>
+
+            <p>
+                📅 {{ expense["expense_date"] or "-" }}
+            </p>
+
+            <p>
+                📝 {{ expense["note"] or "-" }}
+            </p>
+<div class="buttons">
+
+    <a href="/edit-expense/{{ expense['id'] }}"
+       class="btn"
+       style="background:#173b70;">
+        ✏️ Edit
+    </a>
+
+    <a href="/delete-expense/{{ expense['id'] }}"
+       class="btn"
+       style="background:#c62828;"
+       onclick="return confirm('এই Expense টি Delete করতে চান?');">
+        🗑️ Delete
+    </a>
+
+</div>
+
+        </div>
+
+        {% endfor %}
+
+    {% else %}
+
+        <div class="expense-card" style="text-align:center;">
+
+            <p style="color:#777;">
+                কোনো Expense পাওয়া যায়নি।
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+</body>
+</html>

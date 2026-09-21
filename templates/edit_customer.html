@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Customer</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        .header {
+            background: #172554;
+            color: white;
+            padding: 20px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        .form-box {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 9px;
+            font-size: 15px;
+        }
+
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            background: #172554;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #172554;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>✏️ Edit Customer</h1>
+</div>
+
+<div class="container">
+
+    <div class="form-box">
+
+        <form method="POST">
+
+            <label>Customer Name *</label>
+
+            <input
+                type="text"
+                name="name"
+                value="{{ customer['name'] }}"
+                required
+            >
+
+            <label>Phone Number</label>
+
+            <input
+                type="tel"
+                name="phone"
+                value="{{ customer['phone'] }}"
+            >
+
+            <label>Address</label>
+
+            <input
+                type="text"
+                name="address"
+                value="{{ customer['address'] }}"
+            >
+
+
+<label>🏗️ Project</label>
+
+<select name="project_id">
+
+    <option value="">
+        -- Select Project --
+    </option>
+
+    {% for project in projects %}
+
+    <option
+        value="{{ project['id'] }}"
+        {% if customer['project_id'] == project['id'] %}
+            selected
+        {% endif %}
+    >
+        {{ project['name'] }}
+    </option>
+
+    {% endfor %}
+
+</select>
+
+            <label>Follow-up Date</label>
+
+            <input
+                type="date"
+                name="follow_up"
+                value="{{ customer['follow_up'] }}"
+            >
+
+            <label>Sales Amount</label>
+
+            <input
+                type="number"
+                name="sales"
+                value="{{ customer['sales'] }}"
+                step="0.01"
+            >
+
+            <label>Paid Amount</label>
+
+            <input
+                type="number"
+                name="paid"
+                value="{{ customer['paid'] }}"
+                step="0.01"
+            >
+
+            <label>Notes</label>
+
+            <textarea name="notes">{{ customer['notes'] }}</textarea>
+
+            <button type="submit">
+                UPDATE CUSTOMER
+            </button>
+
+        </form>
+
+        <a class="back" href="/customers">
+            ← Back to Customers
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

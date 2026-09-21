@@ -1,0 +1,176 @@
+<!-- Three Dot Menu -->
+
+<style>
+    .menu-button {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 9999;
+
+        width: 42px;
+        height: 42px;
+
+        border: none;
+        border-radius: 50%;
+
+        background: white;
+        color: #172554;
+
+        font-size: 26px;
+        font-weight: bold;
+
+        box-shadow: 0 3px 10px rgba(0,0,0,0.25);
+
+        cursor: pointer;
+    }
+
+    .side-menu {
+        position: fixed;
+        top: 0;
+        left: -280px;
+
+        width: 260px;
+        height: 100vh;
+
+        background: #172554;
+
+        z-index: 9998;
+
+        padding-top: 70px;
+
+        transition: 0.3s;
+
+        box-shadow: 4px 0 15px rgba(0,0,0,0.25);
+    }
+
+    .side-menu.open {
+        left: 0;
+    }
+
+    .side-menu a {
+        display: block;
+
+        padding: 14px 20px;
+
+        color: white;
+
+        text-decoration: none;
+
+        font-size: 16px;
+
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .side-menu a:hover {
+        background: #1e3a8a;
+    }
+
+    .menu-title {
+        color: #d4af37;
+
+        font-size: 20px;
+
+        font-weight: bold;
+
+        padding: 0 20px 20px;
+    }
+
+    .menu-overlay {
+        display: none;
+
+        position: fixed;
+
+        top: 0;
+        left: 0;
+
+        width: 100%;
+        height: 100vh;
+
+        background: rgba(0,0,0,0.35);
+
+        z-index: 9997;
+    }
+
+    .menu-overlay.show {
+        display: block;
+    }
+</style>
+
+
+<button
+    class="menu-button"
+    onclick="toggleMenu()"
+>
+    ⋮
+</button>
+
+
+<div
+    id="menuOverlay"
+    class="menu-overlay"
+    onclick="toggleMenu()"
+></div>
+
+
+<div
+    id="sideMenu"
+    class="side-menu"
+>
+
+    <div class="menu-title">
+        🏢 My Business CRM
+    </div>
+
+    <a href="/dashboard">
+        🏠 Dashboard
+    </a>
+
+    <a href="/leads">
+        📞 Leads
+    </a>
+
+    <a href="/customers">
+        👥 Customers
+    </a>
+
+    <a href="/projects">
+        🏗️ Projects
+    </a>
+
+    <a href="/followups">
+        📅 Follow-ups
+    </a>
+
+    <a href="/expenses">
+        💸 Expenses
+    </a>
+
+    <a href="/reports">
+        📊 Reports
+    </a>
+
+    <a href="/users">
+        👤 CRM Users
+    </a>
+
+    <a href="/logout">
+        🚪 Logout
+    </a>
+
+</div>
+
+
+<script>
+    function toggleMenu() {
+
+        document
+            .getElementById("sideMenu")
+            .classList
+            .toggle("open");
+
+        document
+            .getElementById("menuOverlay")
+            .classList
+            .toggle("show");
+    }
+</script>

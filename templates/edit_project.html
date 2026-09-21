@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Edit Project - My Business CRM</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 18px;
+            border-bottom: 3px solid #d4af37;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 800;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: auto;
+            padding: 18px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 7px;
+            color: #374151;
+            font-weight: 700;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #d1d5db;
+            border-radius: 9px;
+            font-size: 15px;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 22px;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: #173b70;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .back {
+            display: block;
+            margin-top: 18px;
+            text-align: center;
+            color: #173b70;
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="header">
+    <h1>✏️ Edit Project</h1>
+</div>
+
+<div class="container">
+
+    <div class="card">
+
+        <form method="POST">
+
+            <label>Project Name</label>
+
+            <input
+                type="text"
+                name="name"
+                value="{{ project['name'] }}"
+                required
+            >
+
+            <label>Location</label>
+
+            <input
+                type="text"
+                name="location"
+                value="{{ project['location'] or '' }}"
+            >
+
+            <label>Status</label>
+
+            <select name="status">
+
+                <option value="Active"
+                    {% if project['status'] == 'Active' %}
+                    selected
+                    {% endif %}>
+                    Active
+                </option>
+
+                <option value="Inactive"
+                    {% if project['status'] == 'Inactive' %}
+                    selected
+                    {% endif %}>
+                    Inactive
+                </option>
+
+            </select>
+
+            <label>Project Notes</label>
+
+            <textarea
+                name="notes"
+            >{{ project['notes'] or '' }}</textarea>
+
+            <button type="submit">
+                💾 Update Project
+            </button>
+
+        </form>
+
+        <a class="back" href="/projects">
+            ← Back to Projects
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>

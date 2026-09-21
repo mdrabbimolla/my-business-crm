@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Payment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            padding: 20px;
+        }
+
+        .box {
+            max-width: 500px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            margin-top: 6px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+
+        button {
+            width: 100%;
+            padding: 13px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 8px;
+            background: #198754;
+            color: white;
+            font-size: 16px;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            text-decoration: none;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="box">
+
+    <h2>💰 Add Payment</h2>
+
+    <p>
+        <strong>Customer:</strong>
+        {{ customer["name"] }}
+    </p>
+
+    <form method="POST">
+
+        <label>Payment Amount</label>
+        <input
+            type="number"
+            name="amount"
+            step="0.01"
+            placeholder="Enter payment amount"
+            required
+        >
+
+        <label>Payment Date</label>
+        <input
+            type="date"
+            name="payment_date"
+            required
+        >
+
+        <label>Note</label>
+        <textarea
+            name="note"
+            rows="4"
+            placeholder="Payment note"
+        ></textarea>
+
+        <button type="submit">
+            💾 Save Payment
+        </button>
+
+    </form>
+
+    <a class="back" href="/customer/{{ customer['id'] }}">
+        ← Back to Customer Profile
+    </a>
+
+</div>
+
+</body>
+</html>

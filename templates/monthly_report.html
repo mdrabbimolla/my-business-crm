@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Monthly Sales Report</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6f8;
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            background: #172554;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 15px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        .month {
+            font-size: 20px;
+            font-weight: bold;
+            color: #172554;
+            margin-bottom: 15px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .value {
+            font-weight: bold;
+            color: #172554;
+        }
+
+        .profit {
+            color: #198754;
+        }
+
+        .back {
+            display: block;
+            text-align: center;
+            background: #172554;
+            color: white;
+            text-decoration: none;
+            padding: 13px;
+            border-radius: 8px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        .empty {
+            text-align: center;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            color: #777;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<div class="header">
+    <h2>📊 Monthly Sales Report</h2>
+</div>
+
+<div class="container">
+
+    {% if monthly_report %}
+
+        {% for report in monthly_report %}
+
+        <div class="card">
+
+            <div class="month">
+                📅 {{ report['month'] }}
+            </div>
+
+            <div class="row">
+                <span class="label">💰 Sales</span>
+                <span class="value">
+                    ৳{{ "%.2f"|format(report['sales'] or 0) }}
+                </span>
+            </div>
+
+            <div class="row">
+                <span class="label">💳 Payments</span>
+                <span class="value">
+                    ৳{{ "%.2f"|format(report['payments'] or 0) }}
+                </span>
+            </div>
+
+            <div class="row">
+                <span class="label">💸 Expenses</span>
+                <span class="value">
+                    ৳{{ "%.2f"|format(report['expenses'] or 0) }}
+                </span>
+            </div>
+
+            <div class="row">
+                <span class="label">📈 Net</span>
+                <span class="value profit">
+                    ৳{{ "%.2f"|format(
+                        (report['sales'] or 0)
+                        - (report['expenses'] or 0)
+                    ) }}
+                </span>
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    {% else %}
+
+        <div class="empty">
+            📭 কোনো Monthly Report পাওয়া যায়নি।
+        </div>
+
+    {% endif %}
+
+    <a href="/reports" class="back">
+        ⬅ Back to Reports
+    </a>
+
+</div>
+
+</body>
+
+</html>

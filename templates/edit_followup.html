@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Edit Follow-up</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f4f6f8;
+    font-family: Arial, sans-serif;
+}
+
+.header {
+    background: #173b70;
+    color: white;
+    padding: 20px;
+}
+
+.header h2 {
+    margin: 0;
+}
+
+.container {
+    max-width: 600px;
+    margin: 30px auto;
+    padding: 20px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+}
+
+label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 7px;
+    font-weight: bold;
+}
+
+input,
+textarea,
+select {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+button {
+    width: 100%;
+    margin-top: 20px;
+    padding: 14px;
+    border: none;
+    border-radius: 9px;
+    background: #173b70;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.back {
+    display: block;
+    text-align: center;
+    margin-top: 15px;
+    color: #173b70;
+    text-decoration: none;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <h2>✏️ Edit Follow-up</h2>
+</div>
+
+<div class="container">
+
+<div class="card">
+
+<form method="POST">
+
+<label>Customer Name</label>
+
+<input
+    type="text"
+    name="name"
+    value="{{ followup['name'] }}"
+    required
+>
+
+<label>Phone Number</label>
+
+<input
+    type="tel"
+    name="phone"
+    value="{{ followup['phone'] or '' }}"
+>
+
+<label>Follow-up Date</label>
+
+<input
+    type="date"
+    name="follow_up_date"
+    value="{{ followup['follow_up_date'] or '' }}"
+    required
+>
+
+<label>Follow-up Note</label>
+
+<textarea
+    name="note"
+    placeholder="Write follow-up note..."
+>{{ followup['note'] or '' }}</textarea>
+
+<label>Status</label>
+
+<select name="status">
+
+<option value="Number Off"
+    {% if followup['status'] == 'Number Off' %}selected{% endif %}>
+    📵 Number Off
+</option>
+
+<option value="Not Received"
+    {% if followup['status'] == 'Not Received' %}selected{% endif %}>
+    📞 Not Received
+</option>
+
+<option value="Positive"
+    {% if followup['status'] == 'Positive' %}selected{% endif %}>
+    😊 Positive
+</option>
+
+<option value="Cancel"
+    {% if followup['status'] == 'Cancel' %}selected{% endif %}>
+    ❌ Cancel
+</option>
+</select>
+
+<button type="submit">
+    💾 UPDATE FOLLOW-UP
+</button>
+
+</form>
+
+<a href="/followups" class="back">
+    ← Back to Follow-up List
+</a>
+
+</div>
+
+</div>
+
+</body>
+</html>

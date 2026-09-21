@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Receipt Settings</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #f4f6f8;
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            background: #173b70;
+            color: white;
+            padding: 20px;
+        }
+
+        .header h2 {
+            margin: 0;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 14px;
+            border: none;
+            border-radius: 9px;
+            background: #173b70;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="header">
+        <h2>⚙️ Receipt Settings</h2>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+
+            <form method="POST">
+
+                <label>
+                    Receipt Header Name
+                </label>
+
+<input
+    type="text"
+    name="header_name"
+    value="{{ settings['header_name'] }}"
+    placeholder="Enter Header Name"
+    required
+    style="display:block; width:100%; padding:13px; border:1px solid #ddd; border-radius:8px; font-size:16px; color:#000; background:#fff;"
+>
+                <button type="submit">
+                    💾 Save Header Name
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</body>
+
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Add User - My Business CRM</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172554;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 20px;
+            border-bottom: 4px solid #d4af37;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+
+        .container {
+            padding: 15px;
+            max-width: 600px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 14px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+
+        label {
+            display: block;
+            margin-top: 14px;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 15px;
+        }
+
+        .save-btn {
+            width: 100%;
+            margin-top: 20px;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            background: #15803d;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            display: block;
+            text-align: center;
+            margin-top: 12px;
+            padding: 12px;
+            background: #e2e8f0;
+            color: #172554;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+{% include "menu.html" %}
+
+<body>
+
+    <div class="header">
+        <h1>➕ Add CRM User</h1>
+    </div>
+
+    <div class="container">
+
+        <div class="card">
+
+            <form method="POST">
+
+                <label>👤 Name</label>
+                <input
+                    type="text"
+                    name="name"
+                    placeholder="Enter user name"
+                >
+
+                <label>🔑 Username *</label>
+                <input
+                    type="text"
+                    name="username"
+                    placeholder="Enter username"
+                    required
+                >
+
+                <label>🔒 Password *</label>
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Enter password"
+                    required
+                >
+
+                <label>🛡️ Role</label>
+
+                <select name="role">
+
+                    <option value="Sales">
+                        Sales
+                    </option>
+
+                    <option value="Manager">
+                        Manager
+                    </option>
+
+                    <option value="Admin">
+                        Admin
+                    </option>
+
+                </select>
+
+                <label>📌 Status</label>
+
+                <select name="active">
+
+                    <option value="1">
+                        Active
+                    </option>
+
+                    <option value="0">
+                        Inactive
+                    </option>
+
+                </select>
+
+                <button
+                    type="submit"
+                    class="save-btn"
+                >
+                    💾 Create User
+                </button>
+
+            </form>
+
+            <a
+                href="/users"
+                class="back-btn"
+            >
+                ← Back to Users
+            </a>
+
+        </div>
+
+    </div>
+
+</body>
+</html>

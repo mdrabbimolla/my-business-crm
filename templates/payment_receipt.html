@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <title>Money Receipt</title>
+
+    <style>
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #eee;
+            font-family: Arial, sans-serif;
+        }
+
+        .receipt {
+            width: 100%;
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            border: 2px solid #173b70;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Header */
+
+.header {
+    background: linear-gradient(135deg, #172554, #173b70);
+    color: white;
+    padding: 20px 25px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 4px solid #d4af37;
+}
+
+.company {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+
+        .company-small {
+            font-size: 11px;
+            margin-top: 3px;
+        }
+
+        .receipt-title {
+            background: #ffffff;
+            color: #173b70;
+            padding: 10px 25px;
+            border-radius: 5px;
+            font-size: 22px;
+            font-weight: bold;
+        }
+
+        /* Top Information */
+
+        .top-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px 40px;
+            padding: 20px 30px 5px;
+            font-size: 16px;
+        }
+
+        .line {
+            border-bottom: 1px dotted #333;
+            min-height: 28px;
+        }
+
+        /* Main Information */
+
+        .main {
+            padding: 10px 30px 25px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 180px 1fr 150px 1fr;
+            gap: 10px;
+            align-items: center;
+            margin-top: 15px;
+        }
+
+        .label {
+            font-weight: bold;
+        }
+
+        .value {
+            border-bottom: 1px dotted #333;
+            min-height: 25px;
+        }
+
+        /* Amount */
+
+.amount-box {
+    margin-top: 25px;
+    background: #f8fafc;
+    border: 2px solid #d4af37;
+    border-radius: 10px;
+    padding: 18px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #172554;
+    text-align: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.06);
+}
+
+        /* Description */
+
+        .description {
+            margin-top: 20px;
+        }
+
+        .description-line {
+            border-bottom: 1px dotted #333;
+            min-height: 30px;
+        }
+
+        /* Due */
+
+        .due-box {
+            margin-top: 18px;
+            padding: 12px;
+            border: 1px solid #173b70;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        /* Footer */
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            padding: 35px 30px 20px;
+        }
+
+        .signature {
+            text-align: center;
+            width: 180px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #333;
+            margin-top: 35px;
+            padding-top: 5px;
+        }
+
+        .address {
+            background: #173b70;
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 12px;
+        }
+
+        /* Print */
+
+        .print-button {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 12px;
+            background: #173b70;
+            color: white;
+            border: none;
+            border-radius: 7px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+@media (max-width: 600px) {
+
+    body {
+        padding: 8px;
+    }
+
+    .receipt {
+        width: 100%;
+        border-width: 1px;
+    }
+
+    .header {
+        padding: 14px;
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+
+    .company {
+        font-size: 22px;
+    }
+
+    .receipt-title {
+        font-size: 18px;
+        padding: 8px 18px;
+    }
+
+    .top-info {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 15px;
+        font-size: 14px;
+    }
+
+    .main {
+        padding: 8px 15px 20px;
+    }
+
+    .row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+        margin-top: 12px;
+    }
+
+    .value {
+        margin-bottom: 5px;
+    }
+
+    .amount-box {
+        font-size: 19px;
+        padding: 12px;
+    }
+
+    .due-box {
+        font-size: 16px;
+    }
+
+    .footer {
+        flex-direction: column;
+        align-items: center;
+        gap: 25px;
+        padding: 25px 15px 15px;
+    }
+
+    .signature {
+        width: 180px;
+    }
+
+    .address {
+        font-size: 11px;
+        padding: 9px;
+    }
+
+}
+
+        @media print {
+
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .receipt {
+                max-width: none;
+                width: 100%;
+                border: none;
+            }
+
+            .print-button {
+                display: none;
+            }
+
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+    <div class="receipt">
+
+        <!-- HEADER -->
+
+        <div class="header">
+
+            <div>
+                <div class="company">
+                    {{ settings['header_name'] }}
+                </div>
+
+                <div class="company-small">
+                    ARKAM BUILDERS LIMITED
+                </div>
+            </div>
+
+            <div class="receipt-title">
+                Money Receipt
+            </div>
+
+        </div>
+
+
+        <!-- TOP INFO -->
+
+        <div class="top-info">
+
+            <div>
+                No:
+                <span class="line">
+                    PAY-{{ payment['id'] }}
+                </span>
+            </div>
+
+            <div>
+                Date:
+                <span class="line">
+                    {{ payment['payment_date'] }}
+                </span>
+            </div>
+
+            <div>
+                Received from:
+                <span class="line">
+                    {{ customer['name'] }}
+                </span>
+            </div>
+
+            <div>
+                Customer ID:
+                <span class="line">
+                    {{ customer['id'] }}
+                </span>
+            </div>
+
+        </div>
+
+
+        <!-- MAIN -->
+
+        <div class="main">
+
+            <div class="row">
+
+                <div class="label">
+                    Flat Type:
+                </div>
+
+                <div class="value">
+                </div>
+
+                <div class="label">
+                    Payment Date:
+                </div>
+
+                <div class="value">
+                    {{ payment['payment_date'] }}
+                </div>
+
+            </div>
+
+
+            <div class="row">
+
+                <div class="label">
+                    The Sum Of Taka:
+                </div>
+
+                <div class="value">
+                    {{ payment['amount'] }}
+                </div>
+
+                <div class="label">
+                    Customer:
+                </div>
+
+                <div class="value">
+                    {{ customer['name'] }}
+                </div>
+
+            </div>
+
+
+            <!-- PAYMENT AMOUNT -->
+
+            <div class="amount-box">
+
+                Received Amount:
+                ৳{{ "%.2f"|format(payment['amount']) }}
+
+            </div>
+
+
+            <!-- DESCRIPTION -->
+
+            <div class="description">
+
+                <strong>
+                    Description:
+                </strong>
+
+                <div class="description-line">
+
+                    {{ payment['note'] or '' }}
+
+                </div>
+
+            </div>
+
+
+            <!-- DUE PAYMENT -->
+
+            {% if show_due %}
+
+            <div class="due-box">
+
+                Due Payment:
+                ৳{{ "%.2f"|format(due) }}
+
+            </div>
+
+            {% endif %}
+
+
+        </div>
+
+
+        <!-- FOOTER -->
+
+        <div class="footer">
+
+            <div class="signature">
+
+                <div class="signature-line">
+                    Accounts Officer
+                </div>
+
+            </div>
+
+
+            <div class="signature">
+
+                <div class="signature-line">
+                    Authorized Signature
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- ADDRESS -->
+
+        <div class="address">
+
+            Arkam MC Park | Dhaka, Bangladesh
+
+        </div>
+
+    </div>
+
+
+    <!-- PRINT -->
+
+    <button
+        class="print-button"
+        onclick="window.print()">
+
+        🖨️ Print Receipt
+
+    </button>
+
+
+</body>
+
+</html>
