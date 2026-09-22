@@ -33,17 +33,41 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ant autoconf automake autopoint ccache cmake g++ gcc git lbzip2 libffi-dev libltdl-dev libssl-dev libtool make patch pkg-config unzip wget zip
+          sudo apt-get install -y \
+            ant \
+            autoconf \
+            automake \
+            autopoint \
+            ccache \
+            cmake \
+            g++ \
+            gcc \
+            git \
+            lbzip2 \
+            libffi-dev \
+            libltdl-dev \
+            libssl-dev \
+            libtool \
+            make \
+            patch \
+            pkg-config \
+            unzip \
+            wget \
+            zip
 
-      - name: Install p4a
+      - name: Install build tools
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install "Cython<3"
           pip install python-for-android==2026.05.09
 
       - name: Prepare app
         run: |
           cp app.py main.py
+
+      - name: Clean p4a
+        run: |
+          p4a clean_all || true
 
       - name: Build APK
         run: |
