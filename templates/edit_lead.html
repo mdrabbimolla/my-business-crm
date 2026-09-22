@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Lead - My Business CRM</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #172554;
+        }
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 20px;
+            border-bottom: 4px solid #d4af37;
+        }
+        .header h1 { margin: 0; font-size: 23px; }
+        .container { max-width: 650px; margin: auto; padding: 18px; }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+        }
+        label {
+            display: block;
+            margin-top: 15px;
+            margin-bottom: 7px;
+            color: #374151;
+            font-weight: 700;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #cbd5e1;
+            border-radius: 9px;
+            font-size: 15px;
+            font-family: Arial, sans-serif;
+        }
+        textarea { min-height: 110px; resize: vertical; }
+        .hint {
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 12px;
+        }
+        .save {
+            width: 100%;
+            margin-top: 22px;
+            padding: 14px;
+            border: 0;
+            border-radius: 10px;
+            background: #173b70;
+            color: white;
+            font-size: 16px;
+            font-weight: 800;
+        }
+        .back {
+            display: block;
+            margin-top: 16px;
+            text-align: center;
+            color: #173b70;
+            text-decoration: none;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body>
+{% include "menu.html" %}
+<div class="header">
+    <h1>✏️ Edit Lead</h1>
+</div>
+<div class="container">
+    <div class="card">
+        <form method="POST">
+            <label>Customer Name</label>
+            <input type="text" name="name" value="{{ lead['name'] or '' }}">
+
+            <label>Phone Number *</label>
+            <input type="tel" name="phone" value="{{ lead['phone'] or '' }}" required>
+            <div class="hint">⚠️ Phone number must remain unique in the CRM.</div>
+
+            <label>Project</label>
+            <select name="project_id">
+                <option value="">📂 Unassigned</option>
+                {% for project in projects %}
+                <option value="{{ project['id'] }}"
+                    {% if lead['project_id'] == project['id'] %}selected{% endif %}>
+                    🏗️ {{ project['name'] }}
+                </option>
+                {% endfor %}
+            </select>
+
+            <label>👤 Assigned Salesperson</label>
+            {% if current_role in ['Admin', 'Manager'] %}
+            <select name="assigned_to">
+                <option value="">👤 Unassigned</option>
+                {% for user in sales_users %}
+                <option value="{{ user['username'] }}"
+                    {% if lead['assigned_to'] == user['username'] %}selected{% endif %}>
+                    👤 {{ user['name'] or user['username'] }}
+                </option>
+                {% endfor %}
+            </select>
+            {% else %}
+            <input type="text" value="{{ lead['assigned_to'] or 'Unassigned' }}" disabled>
+            {% endif %}
+
+            <label>Follow-up Date</label>
+            <input type="date" name="follow_up_date" value="{{ lead['follow_up_date'] or '' }}">
+
+            <label>📍 Visit Date</label>
+            <input type="date" name="visit_date" value="{{ lead['visit_date'] or '' }}">
+
+            <label>⏰ Visit Time</label>
+            <input type="time" name="visit_time" value="{{ lead['visit_time'] or '' }}">
+
+            <label>Status</label>
+            <select name="status">
+                <option value="New" {% if lead['status'] == 'New' %}selected{% endif %}>New</option>
+                <option value="Interested" {% if lead['status'] == 'Interested' %}selected{% endif %}>Interested</option>
+                <option value="Not Interested" {% if lead['status'] == 'Not Interested' %}selected{% endif %}>Not Interested</option>
+                <option value="Call Later" {% if lead['status'] == 'Call Later' %}selected{% endif %}>Call Later</option>
+                <option value="Converted" {% if lead['status'] == 'Converted' %}selected{% endif %}>Converted</option>
+            </select>
+
+            <label>Notes</label>
+            <textarea name="notes" placeholder="Write conversation notes...">{{ lead['notes'] or '' }}</textarea>
+
+            <button class="save" type="submit">💾 Save Changes</button>
+        </form>
+
+        <a class="back" href="/leads">← Back to Leads</a>
+    </div>
+</div>
+</body>
+</html>
