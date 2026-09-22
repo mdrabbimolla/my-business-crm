@@ -20,7 +20,7 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 2048
+          root-reserve-mb: 12288
           swap-size-mb: 2048
           remove-dotnet: true
           remove-haskell: true
@@ -29,7 +29,6 @@ jobs:
 
       - name: Free additional disk space
         run: |
-          sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
           sudo rm -rf /usr/local/share/powershell
           sudo rm -rf /usr/share/dotnet
@@ -54,7 +53,7 @@ jobs:
 
       - name: Build APK
         run: |
-          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm"             --workdir /home/user/crm             kivy/python-for-android:latest             /home/user/app/venv/bin/p4a apk               --private /home/user/crm               --package com.mycrm.app               --name "My Business CRM"               --version 1.0               --bootstrap webview               --requirements flask               --port 5000               --arch arm64-v8a
+          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm"             --volume "/usr/local/lib/android:/opt/android-host:ro"             --workdir /home/user/crm             --env ANDROIDSDK=/opt/android-host/sdk             --env ANDROID_HOME=/opt/android-host/sdk             --env ANDROID_SDK_ROOT=/opt/android-host/sdk             --env PATH=/opt/android-host/sdk/cmdline-tools/latest/bin:/opt/android-host/sdk/platform-tools:/opt/android-host/sdk/tools/bin:$PATH             kivy/python-for-android:latest             /home/user/app/venv/bin/p4a apk               --private /home/user/crm               --sdk-dir /opt/android-host/sdk               --package com.mycrm.app               --name "My Business CRM"               --version 1.0               --bootstrap webview               --requirements flask               --port 5000               --arch arm64-v8a               --android-api 33               --ndk-api 24
 
       - name: Find APK
         run: |
