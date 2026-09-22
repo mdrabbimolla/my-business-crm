@@ -42,6 +42,7 @@ jobs:
           cp app.py main.py
           test -s main.py
           mkdir -p apk-output
+          chmod 777 apk-output
           echo "main.py created successfully"
 
       - name: Build APK
