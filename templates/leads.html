@@ -118,28 +118,67 @@
         }
 
         .actions {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 9px;
+            margin-top: 14px;
         }
 
         .action-btn {
-            flex: 1;
+            min-height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             text-decoration: none;
             text-align: center;
-            padding: 10px;
-            border-radius: 8px;
-            font-weight: bold;
+            padding: 9px 6px;
+            border-radius: 13px;
+            font-weight: 800;
+            font-size: 14px;
+            line-height: 1.15;
+            border: 1px solid transparent;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+            transition: transform 0.15s ease;
+        }
+
+        .action-btn:active {
+            transform: scale(0.97);
         }
 
         .call {
-            background: #dbeafe;
+            background: linear-gradient(135deg, #dbeafe, #bfdbfe);
             color: #1d4ed8;
+            border-color: #93c5fd;
         }
 
         .whatsapp {
-            background: #dcfce7;
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
             color: #15803d;
+            border-color: #86efac;
+        }
+
+        .edit {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #fcd34d;
+        }
+
+        .visit {
+            background: #ede9fe;
+            color: #5b21b6;
+            border-color: #c4b5fd;
+        }
+
+        .reassign {
+            background: #f1f5f9;
+            color: #334155;
+            border-color: #cbd5e1;
+        }
+
+        .action-icon {
+            display: block;
+            font-size: 22px;
+            margin-bottom: 3px;
         }
 
         .empty {
@@ -229,14 +268,18 @@
     }
 
     .actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 7px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
     }
 
     .action-btn {
-        padding: 10px 5px;
+        min-height: 58px;
+        padding: 8px 4px;
         font-size: 12px;
+    }
+
+    .action-icon {
+        font-size: 20px;
     }
 
 }
@@ -337,30 +380,55 @@
                     <div class="actions">
 
                         <a
-                            href="tel:{{ lead['phone'] }}"
+                            href="/android-call?phone={{ lead['phone']|urlencode }}"
                             class="action-btn call"
                         >
-                            📞 Call
+                            <span>
+                                <span class="action-icon">📞</span>
+                                Call
+                            </span>
                         </a>
 
                         <a
-                            href="https://wa.me/{{ lead['phone'] }}"
+                            href="/android-whatsapp?phone={{ lead['phone']|urlencode }}"
                             class="action-btn whatsapp"
                         >
-                            💬 WhatsApp
+                            <span>
+                                <span class="action-icon">💬</span>
+                                WhatsApp Business
+                            </span>
                         </a>
 
-<a
-    href="/set-visit/{{ lead['id'] }}"
-    class="action-btn"
->
-    📍 Set Visit
-</a>
+                        <a
+                            href="/edit-lead/{{ lead['id'] }}"
+                            class="action-btn edit"
+                        >
+                            <span>
+                                <span class="action-icon">✏️</span>
+                                Edit Lead
+                            </span>
+                        </a>
+
+                        <a
+                            href="/set-visit/{{ lead['id'] }}"
+                            class="action-btn visit"
+                        >
+                            <span>
+                                <span class="action-icon">📍</span>
+                                Set Visit
+                            </span>
+                        </a>
 
 {% if session.get("username") == "admin" %}
-    <a href="/reassign-lead/{{ lead['id'] }}">
-        🔄 Reassign
-    </a>
+                        <a
+                            href="/reassign-lead/{{ lead['id'] }}"
+                            class="action-btn reassign"
+                        >
+                            <span>
+                                <span class="action-icon">🔄</span>
+                                Reassign
+                            </span>
+                        </a>
 {% endif %}
 
                     </div>
