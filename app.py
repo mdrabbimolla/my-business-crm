@@ -1,6 +1,12 @@
 from datetime import date
+from urllib.parse import quote
 from flask import Flask, request, redirect, session, render_template
 from database import get_db, init_db
+
+try:
+    from jnius import autoclass
+except ImportError:
+    autoclass = None
 
 app = Flask(__name__)
 
@@ -8,6 +14,34 @@ app.secret_key = "mycrm-secret-key"
 
 
 init_db()
+
+
+def open_android_url(url):
+    if autoclass is None:
+        return False
+
+    try:
+        Intent = autoclass("android.content.Intent")
+        Uri = autoclass("android.net.Uri")
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+
+        intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        PythonActivity.mActivity.startActivity(intent)
+        return True
+    except Exception:
+        return False
+
+
+def clean_phone(phone):
+    phone = (phone or "").strip()
+    phone = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+    if phone.startswith("+"):
+        phone = phone[1:]
+    if phone.startswith("880"):
+        return phone
+    if phone.startswith("0"):
+        return "88" + phone
+    return phone
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -72,6 +106,36 @@ def login():
 
     </form>
     """
+
+@app.route("/android-call")
+def android_call():
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    phone = clean_phone(request.args.get("phone"))
+    next_url = request.args.get("next", "/customers")
+
+    if not phone:
+        return "Phone number is missing"
+
+    open_android_url("tel:" + phone)
+    return redirect(next_url)
+
+
+@app.route("/android-whatsapp")
+def android_whatsapp():
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    phone = clean_phone(request.args.get("phone"))
+    next_url = request.args.get("next", "/customers")
+
+    if not phone:
+        return "Phone number is missing"
+
+    open_android_url("https://wa.me/" + phone)
+    return redirect(next_url)
+
 
 @app.route("/change-password", methods=["GET", "POST"])
 def change_password():
