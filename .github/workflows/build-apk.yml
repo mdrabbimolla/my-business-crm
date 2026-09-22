@@ -45,7 +45,14 @@ jobs:
 
       - name: Build APK
         run: |
-          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm"             --volume "/usr/local/lib/android/sdk:/opt/android-sdk"             --workdir /home/user/crm             --env ANDROIDSDK=/opt/android-sdk             --env ANDROID_HOME=/opt/android-sdk             --env ANDROID_SDK_ROOT=/opt/android-sdk             --env ANDROIDNDK=/home/user/.android/android-ndk             --env ANDROID_NDK_HOME=/home/user/.android/android-ndk             --env PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin:$PATH             kivy/python-for-android:latest             /home/user/app/venv/bin/p4a apk               --private /home/user/crm               --sdk-dir /opt/android-sdk               --ndk-dir /home/user/.android/android-ndk               --package com.mycrm.app               --name "My Business CRM"               --version 1.0               --bootstrap webview               --requirements flask               --port 5000               --arch arm64-v8a               --android-api 35               --ndk-api 24
+          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm:ro"             --volume "/usr/local/lib/android/sdk:/opt/android-sdk:ro"             --workdir /home/user             --env ANDROIDSDK=/opt/android-sdk             --env ANDROID_HOME=/opt/android-sdk             --env ANDROID_SDK_ROOT=/opt/android-sdk             --env ANDROIDNDK=/home/user/.android/android-ndk             --env ANDROID_NDK_HOME=/home/user/.android/android-ndk             --env PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin:$PATH             kivy/python-for-android:latest             sh -c '
+              rm -rf /tmp/mycrm &&
+              mkdir -p /tmp/mycrm &&
+              cp -a /home/user/crm/. /tmp/mycrm/ &&
+              chmod -R u+rwX /tmp/mycrm &&
+              cd /tmp/mycrm &&
+              /home/user/app/venv/bin/p4a apk                 --private /tmp/mycrm                 --sdk-dir /opt/android-sdk                 --ndk-dir /home/user/.android/android-ndk                 --package com.mycrm.app                 --name "My Business CRM"                 --version 1.0                 --bootstrap webview                 --requirements flask                 --port 5000                 --arch arm64-v8a                 --android-api 35                 --ndk-api 24
+            '
 
       - name: Find APK
         run: |
