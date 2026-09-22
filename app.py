@@ -17,7 +17,7 @@ app.secret_key = "mycrm-secret-key"
 init_db()
 
 
-def open_android_url(url):
+def open_android_url(url, action="VIEW", package_name=None):
     if autoclass is None or cast is None:
         return False
 
@@ -27,8 +27,17 @@ def open_android_url(url):
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
 
         current_activity = cast("android.app.Activity", PythonActivity.mActivity)
-        intent = Intent(Intent.ACTION_VIEW)
+
+        if action == "DIAL":
+            intent = Intent(Intent.ACTION_DIAL)
+        else:
+            intent = Intent(Intent.ACTION_VIEW)
+
         intent.setData(Uri.parse(url))
+
+        if package_name:
+            intent.setPackage(package_name)
+
         current_activity.startActivity(intent)
         return True
     except Exception:
@@ -116,13 +125,23 @@ def android_call():
         return redirect("/")
 
     phone = clean_phone(request.args.get("phone"))
-    next_url = request.args.get("next", "/customers")
 
     if not phone:
         return "Phone number is missing"
 
-    open_android_url("tel:" + phone)
-    return redirect(next_url)
+    opened = open_android_url("tel:" + phone, action="DIAL")
+
+    if not opened:
+        return """
+        <h3>📞 Call app could not be opened</h3>
+        <p>Please make sure a phone/dialer app is installed.</p>
+        <a href="/customers">← Back</a>
+        """
+
+    return """
+    <h3>📞 Opening phone dialer...</h3>
+    <a href="/customers">← Back to Customers</a>
+    """
 
 
 @app.route("/android-whatsapp")
@@ -131,13 +150,45 @@ def android_whatsapp():
         return redirect("/")
 
     phone = clean_phone(request.args.get("phone"))
-    next_url = request.args.get("next", "/customers")
 
     if not phone:
         return "Phone number is missing"
 
-    open_android_url("https://wa.me/" + phone)
-    return redirect(next_url)
+    whatsapp_url = "https://wa.me/" + phone
+
+    # First try the normal WhatsApp app.
+    opened = open_android_url(
+        whatsapp_url,
+        action="VIEW",
+        package_name="com.whatsapp"
+    )
+
+    # Then try WhatsApp Business.
+    if not opened:
+        opened = open_android_url(
+            whatsapp_url,
+            action="VIEW",
+            package_name="com.whatsapp.w4b"
+        )
+
+    # Final fallback: let Android choose a browser/app.
+    if not opened:
+        opened = open_android_url(
+            whatsapp_url,
+            action="VIEW"
+        )
+
+    if not opened:
+        return """
+        <h3>💬 WhatsApp could not be opened</h3>
+        <p>Please make sure WhatsApp is installed.</p>
+        <a href="/customers">← Back</a>
+        """
+
+    return """
+    <h3>💬 Opening WhatsApp...</h3>
+    <a href="/customers">← Back to Customers</a>
+    """
 
 
 @app.route("/change-password", methods=["GET", "POST"])
