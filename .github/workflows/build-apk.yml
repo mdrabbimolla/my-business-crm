@@ -14,16 +14,28 @@ jobs:
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
-          root-reserve-mb: 4096
-          swap-size-mb: 1024
+          root-reserve-mb: 2048
+          swap-size-mb: 2048
           remove-dotnet: true
           remove-haskell: true
           remove-codeql: true
           remove-docker-images: true
 
+      - name: Free additional disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/powershell
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/hostedtoolcache
+          sudo apt-get clean
+          sudo docker system prune -af --volumes || true
+          df -h
+
       - name: Pull official python-for-android image
         run: |
           docker pull kivy/python-for-android:latest
+          docker image ls
 
       - name: Prepare CRM
         run: |
