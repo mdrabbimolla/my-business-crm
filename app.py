@@ -87,9 +87,11 @@ def change_password():
 
         conn = get_db()
 
+        current_username = session.get("username")
+
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ?",
-            ("admin",)
+            "SELECT * FROM users WHERE username = ? AND active = 1",
+            (current_username,)
         ).fetchone()
 
         if not user:
@@ -114,7 +116,7 @@ def change_password():
             SET password = ?
             WHERE username = ?
             """,
-            (new_password, "admin")
+            (new_password, current_username)
         )
 
         conn.commit()
@@ -189,6 +191,8 @@ def add_user():
 
         return redirect("/users")
 
+    conn.close()
+
     return render_template("add_user.html")
 
 @app.route("/users")
@@ -197,7 +201,15 @@ def users():
     if not session.get("logged_in"):
         return redirect("/")
 
-    if session.get("username") != "admin":
+    conn = get_db()
+
+    current_user = conn.execute(
+        "SELECT role FROM users WHERE username = ? AND active = 1",
+        (session.get("username"),)
+    ).fetchone()
+
+    if not current_user or current_user["role"] != "Admin":
+        conn.close()
         return "Access Denied"
 
     conn = get_db()
