@@ -9,6 +9,18 @@ except ImportError:
     autoclass = None
     cast = None
 
+try:
+    from android.permissions import request_permissions, check_permission, Permission
+except ImportError:
+    request_permissions = None
+    check_permission = None
+    Permission = None
+
+try:
+    from android.runnable import run_on_ui_thread
+except ImportError:
+    run_on_ui_thread = None
+
 app = Flask(__name__)
 
 app.secret_key = "mycrm-secret-key"
@@ -17,7 +29,7 @@ app.secret_key = "mycrm-secret-key"
 init_db()
 
 
-def open_android_url(url, action="VIEW", package_name=None):
+def _start_android_url(url, action="VIEW", package_name=None):
     if autoclass is None or cast is None:
         return False
 
@@ -25,10 +37,11 @@ def open_android_url(url, action="VIEW", package_name=None):
         Intent = autoclass("android.content.Intent")
         Uri = autoclass("android.net.Uri")
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
-
         current_activity = cast("android.app.Activity", PythonActivity.mActivity)
 
-        if action == "DIAL":
+        if action == "CALL":
+            intent = Intent(Intent.ACTION_CALL)
+        elif action == "DIAL":
             intent = Intent(Intent.ACTION_DIAL)
         else:
             intent = Intent(Intent.ACTION_VIEW)
@@ -40,9 +53,46 @@ def open_android_url(url, action="VIEW", package_name=None):
 
         current_activity.startActivity(intent)
         return True
+    except Exception as exc:
+        print("ANDROID INTENT ERROR:", exc)
+        return False
+
+
+def open_android_url(url, action="VIEW", package_name=None):
+    if autoclass is None or cast is None:
+        return False
+
+    if run_on_ui_thread is not None:
+        try:
+            run_on_ui_thread(_start_android_url)(url, action, package_name)
+            return True
+        except Exception as exc:
+            print("ANDROID UI THREAD ERROR:", exc)
+            return False
+
+    return _start_android_url(url, action, package_name)
+
+
+def android_call_permission_granted():
+    if check_permission is None or Permission is None:
+        return False
+    try:
+        return bool(check_permission(Permission.CALL_PHONE))
     except Exception:
         return False
 
+
+def request_android_call_permission():
+    if request_permissions is None or Permission is None:
+        return False
+    try:
+        if not android_call_permission_granted():
+            request_permissions([Permission.CALL_PHONE])
+            return False
+        return True
+    except Exception as exc:
+        print("ANDROID PERMISSION ERROR:", exc)
+        return False
 
 def clean_phone(phone):
     phone = (phone or "").strip()
@@ -129,18 +179,25 @@ def android_call():
     if not phone:
         return "Phone number is missing"
 
-    opened = open_android_url("tel:" + phone, action="DIAL")
+    if not request_android_call_permission():
+        return """
+        <h3>📞 Phone permission needed</h3>
+        <p>Please tap <strong>Allow</strong> when Android asks for call permission, then tap Call again.</p>
+        <a href="/leads">← Back to Leads</a>
+        """
+
+    opened = open_android_url("tel:" + phone, action="CALL")
 
     if not opened:
         return """
-        <h3>📞 Call app could not be opened</h3>
+        <h3>📞 Call could not be opened</h3>
         <p>Please make sure a phone/dialer app is installed.</p>
-        <a href="/customers">← Back</a>
+        <a href="/leads">← Back to Leads</a>
         """
 
     return """
-    <h3>📞 Opening phone dialer...</h3>
-    <a href="/customers">← Back to Customers</a>
+    <h3>📞 Calling...</h3>
+    <a href="/leads">← Back to Leads</a>
     """
 
 
@@ -154,7 +211,7 @@ def android_whatsapp():
     if not phone:
         return "Phone number is missing"
 
-    whatsapp_url = "https://wa.me/" + phone
+    whatsapp_url = "whatsapp://send?phone=" + phone
 
     # Only WhatsApp Business is allowed for this CRM.
     opened = open_android_url(
@@ -1725,6 +1782,16 @@ def delete_expense(expense_id):
     conn.close()
 
     return redirect("/expenses")
+def save_lead_note(conn, lead_id, note):
+    note = (note or "").strip()
+    if not note:
+        return
+    conn.execute("""
+        INSERT INTO lead_notes (lead_id, note, note_date)
+        VALUES (?, ?, ?)
+    """, (lead_id, note, date.today().isoformat()))
+
+
 @app.route("/leads")
 def leads():
 
@@ -1750,7 +1817,9 @@ def leads():
         SELECT
             leads.*,
             projects.name AS project_name,
-            users.name AS assigned_user_name
+            users.name AS assigned_user_name,
+            (SELECT note FROM lead_notes WHERE lead_id = leads.id ORDER BY id DESC LIMIT 1) AS latest_note,
+            (SELECT note_date FROM lead_notes WHERE lead_id = leads.id ORDER BY id DESC LIMIT 1) AS latest_note_date
         FROM leads
         LEFT JOIN projects
             ON leads.project_id = projects.id
@@ -1886,7 +1955,7 @@ def add_lead():
             <a href="/add-lead">← Back to Add Lead</a>
             """
 
-        conn.execute("""
+        cursor = conn.execute("""
             INSERT INTO leads
             (name, phone, project_id, notes, follow_up_date, status, assigned_to, visit_date, visit_time)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1901,6 +1970,25 @@ def add_lead():
             visit_date,
             visit_time
         ))
+
+        lead_id = cursor.lastrowid
+
+        if notes:
+            save_lead_note(conn, lead_id, notes)
+
+        if follow_up_date:
+            conn.execute("""
+                INSERT INTO followups
+                (lead_id, name, phone, follow_up_date, note, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                lead_id,
+                name,
+                phone,
+                follow_up_date,
+                notes,
+                "New"
+            ))
 
         conn.commit()
         conn.close()
@@ -2009,6 +2097,8 @@ def edit_lead(lead_id):
         if current_user["role"] in ["Admin", "Manager"]:
             assigned_to = request.form.get("assigned_to") or None
 
+        previous_note = lead["notes"] or ""
+
         conn.execute("""
             UPDATE leads
             SET name = ?,
@@ -2033,6 +2123,49 @@ def edit_lead(lead_id):
             assigned_to,
             lead_id
         ))
+
+        if notes and notes != previous_note:
+            save_lead_note(conn, lead_id, notes)
+
+        existing_followup = conn.execute("""
+            SELECT id
+            FROM followups
+            WHERE lead_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+        """, (lead_id,)).fetchone()
+
+        if follow_up_date:
+            if existing_followup:
+                conn.execute("""
+                    UPDATE followups
+                    SET name = ?,
+                        phone = ?,
+                        follow_up_date = ?,
+                        note = ?
+                    WHERE id = ?
+                """, (
+                    name,
+                    phone,
+                    follow_up_date,
+                    notes,
+                    existing_followup["id"]
+                ))
+            else:
+                conn.execute("""
+                    INSERT INTO followups
+                    (lead_id, name, phone, follow_up_date, note, status)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    lead_id,
+                    name,
+                    phone,
+                    follow_up_date,
+                    notes,
+                    "New"
+                ))
+        elif existing_followup:
+            conn.execute("DELETE FROM followups WHERE id = ?", (existing_followup["id"],))
 
         conn.commit()
         conn.close()
@@ -2149,6 +2282,31 @@ def monthly_report():
         "monthly_report.html",
         monthly_report=monthly_report
     )
+@app.route("/lead-notes/<int:lead_id>")
+def lead_notes(lead_id):
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    conn = get_db()
+    lead = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
+
+    if not lead:
+        conn.close()
+        return "Lead not found"
+
+    notes = conn.execute("""
+        SELECT *
+        FROM lead_notes
+        WHERE lead_id = ?
+        ORDER BY id DESC
+    """, (lead_id,)).fetchall()
+
+    conn.close()
+
+    return render_template("lead_notes.html", lead=lead, notes=notes)
+
+
 @app.route("/reassign-lead/<int:lead_id>", methods=["GET", "POST"])
 def reassign_lead(lead_id):
 
@@ -2215,6 +2373,13 @@ def reassign_lead(lead_id):
         sales_users=sales_users
     )
 if __name__ == "__main__":
+    # Ask for call permission automatically when the Android app starts.
+    if request_permissions is not None and Permission is not None and run_on_ui_thread is not None:
+        try:
+            run_on_ui_thread(request_android_call_permission)()
+        except Exception as exc:
+            print("STARTUP PERMISSION ERROR:", exc)
+
     app.run(
         host="0.0.0.0",
         port=5000,
