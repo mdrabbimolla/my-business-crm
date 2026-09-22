@@ -339,7 +339,7 @@ body {
             gap:8px;
             margin-top:10px;">
 
-    <a href="tel:{{ followup['phone'] }}"
+    <a href="/android-call?phone={{ followup['phone']|urlencode }}"
        class="call"
        style="flex:1;
               text-align:center;
@@ -350,7 +350,7 @@ body {
         📞 Call
     </a>
 
-    <a href="https://wa.me/880{{ followup['phone'][1:] }}"
+    <a href="/android-whatsapp?phone={{ followup['phone']|urlencode }}"
        class="whatsapp"
        target="_blank"
        style="flex:1;
@@ -359,7 +359,7 @@ body {
               border-radius:8px;
               text-decoration:none;
               font-weight:bold;">
-        💬 WhatsApp
+        💬 WhatsApp Business
     </a>
 
 </div>
@@ -443,12 +443,12 @@ body {
 
         <div class="buttons">
 
-            <a href="tel:{{ followup['phone'] }}"
+            <a href="/android-call?phone={{ followup['phone']|urlencode }}"
                class="call">
                 📞 Call
             </a>
 
-            <a href="https://wa.me/88{{ followup['phone'] }}"
+            <a href="/android-whatsapp?phone={{ followup['phone']|urlencode }}"
                class="whatsapp"
                target="_blank">
                 💬 WhatsApp
@@ -536,12 +536,12 @@ body {
 
         <div class="buttons">
 
-            <a href="tel:{{ followup['phone'] }}"
+            <a href="/android-call?phone={{ followup['phone']|urlencode }}"
                class="call">
                 📞 Call
             </a>
 
-            <a href="https://wa.me/88{{ followup['phone'] }}"
+            <a href="/android-whatsapp?phone={{ followup['phone']|urlencode }}"
                class="whatsapp"
                target="_blank">
                 💬 WhatsApp
