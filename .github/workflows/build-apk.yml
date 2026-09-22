@@ -32,21 +32,18 @@ jobs:
       - name: Build APK
         run: |
           docker run --rm \
-            --volume "$GITHUB_WORKSPACE:/home/user/app" \
-            --workdir /home/user/app \
+            --volume "$GITHUB_WORKSPACE:/home/user/crm" \
+            --workdir /home/user/crm \
             kivy/python-for-android:latest \
-            sh -c '
-              . venv/bin/activate &&
-              p4a apk \
-                --private /home/user/app \
-                --package com.mycrm.app \
-                --name "My Business CRM" \
-                --version 1.0 \
-                --bootstrap webview \
-                --requirements flask \
-                --port 5000 \
-                --arch arm64-v8a
-            '
+            /home/user/app/venv/bin/p4a apk \
+              --private /home/user/crm \
+              --package com.mycrm.app \
+              --name "My Business CRM" \
+              --version 1.0 \
+              --bootstrap webview \
+              --requirements flask \
+              --port 5000 \
+              --arch arm64-v8a
 
       - name: Find APK
         run: |
