@@ -166,7 +166,7 @@ def android_whatsapp():
     if not opened:
         return """
         <h3>💬 WhatsApp could not be opened</h3>
-        <p>Please make sure WhatsApp is installed.</p>
+        <p>Please make sure WhatsApp Business is installed.</p>
         <a href="/customers">← Back</a>
         """
 
@@ -1914,6 +1914,141 @@ def add_lead():
         projects=projects,
         sales_users=sales_users
     )
+@app.route("/edit-lead/<int:lead_id>", methods=["GET", "POST"])
+def edit_lead(lead_id):
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    conn = get_db()
+
+    current_user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE username = ? AND active = 1
+    """, (session.get("username"),)).fetchone()
+
+    if not current_user:
+        conn.close()
+        return "User not found"
+
+    lead = conn.execute("""
+        SELECT
+            leads.*,
+            projects.name AS project_name
+        FROM leads
+        LEFT JOIN projects
+            ON leads.project_id = projects.id
+        WHERE leads.id = ?
+    """, (lead_id,)).fetchone()
+
+    if not lead:
+        conn.close()
+        return "Lead not found"
+
+    # Sales users may edit only their own assigned leads.
+    if current_user["role"] == "Sales" and lead["assigned_to"] != current_user["username"]:
+        conn.close()
+        return "Access Denied"
+
+    projects = conn.execute("""
+        SELECT *
+        FROM projects
+        WHERE status = 'Active'
+        ORDER BY name
+    """).fetchall()
+
+    sales_users = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE active = 1
+        AND role = 'Sales'
+        ORDER BY name, username
+    """).fetchall()
+
+    if request.method == "POST":
+
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        project_id = request.form.get("project_id") or None
+        notes = request.form.get("notes", "").strip()
+        follow_up_date = request.form.get("follow_up_date") or None
+        visit_date = request.form.get("visit_date") or None
+        visit_time = request.form.get("visit_time") or None
+        status = request.form.get("status", "New")
+
+        if not phone:
+            conn.close()
+            return "Phone number is required"
+
+        # Phone must remain unique across leads and customers.
+        existing_lead = conn.execute("""
+            SELECT id
+            FROM leads
+            WHERE phone = ?
+            AND id != ?
+        """, (phone, lead_id)).fetchone()
+
+        if existing_lead:
+            conn.close()
+            return "Phone number already exists in another lead"
+
+        existing_customer = conn.execute("""
+            SELECT id
+            FROM customers
+            WHERE phone = ?
+        """, (phone,)).fetchone()
+
+        if existing_customer:
+            conn.close()
+            return "Phone number already exists in customers"
+
+        assigned_to = lead["assigned_to"]
+
+        # Only Admin/Manager can change lead assignment.
+        if current_user["role"] in ["Admin", "Manager"]:
+            assigned_to = request.form.get("assigned_to") or None
+
+        conn.execute("""
+            UPDATE leads
+            SET name = ?,
+                phone = ?,
+                project_id = ?,
+                notes = ?,
+                follow_up_date = ?,
+                visit_date = ?,
+                visit_time = ?,
+                status = ?,
+                assigned_to = ?
+            WHERE id = ?
+        """, (
+            name,
+            phone,
+            project_id,
+            notes,
+            follow_up_date,
+            visit_date,
+            visit_time,
+            status,
+            assigned_to,
+            lead_id
+        ))
+
+        conn.commit()
+        conn.close()
+
+        return redirect("/leads")
+
+    conn.close()
+
+    return render_template(
+        "edit_lead.html",
+        lead=lead,
+        projects=projects,
+        sales_users=sales_users,
+        current_role=current_user["role"]
+    )
+
 @app.route("/set-visit/<int:lead_id>", methods=["GET", "POST"])
 def set_visit(lead_id):
 
