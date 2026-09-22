@@ -32,7 +32,7 @@ jobs:
       - name: Build python-for-android Docker image
         working-directory: python-for-android
         run: |
-          docker build --tag mycrm-p4a .
+          docker build --progress=plain --tag mycrm-p4a .
 
       - name: Prepare CRM
         run: |
