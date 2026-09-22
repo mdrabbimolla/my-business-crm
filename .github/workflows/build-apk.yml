@@ -11,6 +11,12 @@ jobs:
       - name: Checkout CRM
         uses: actions/checkout@v4
 
+      - name: Preserve CRM source
+        run: |
+          cp app.py /tmp/mycrm-app.py
+          test -s /tmp/mycrm-app.py
+          echo "CRM source preserved outside workspace"
+
       - name: Maximize build space
         uses: easimon/maximize-build-space@v10
         with:
@@ -41,10 +47,8 @@ jobs:
         run: |
           echo "Workspace: $GITHUB_WORKSPACE"
           pwd
-          echo "Workspace contents:"
           ls -la
-          test -f app.py
-          cp app.py main.py
+          cp /tmp/mycrm-app.py main.py
           test -s main.py
           echo "main.py created successfully"
 
