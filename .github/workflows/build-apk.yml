@@ -11,99 +11,53 @@ jobs:
       - name: Checkout CRM
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@v10
         with:
-          python-version: "3.11"
+          root-reserve-mb: 4096
+          swap-size-mb: 1024
+          remove-dotnet: true
+          remove-haskell: true
+          remove-codeql: true
+          remove-docker-images: true
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - name: Checkout python-for-android
+        uses: actions/checkout@v4
         with:
-          distribution: temurin
-          java-version: "17"
+          repository: kivy/python-for-android
+          ref: 2026.05.09
+          path: python-for-android
 
-      - name: Setup Android
-        uses: android-actions/setup-android@v4
-
-      - name: Install Android SDK
-        shell: bash
+      - name: Build p4a Docker image
+        working-directory: python-for-android
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-33" \
-            "build-tools;35.0.0" \
-            "ndk;28.2.13676358"
+          docker build --tag mycrm-p4a .
 
-      - name: Install system dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            ant \
-            autoconf \
-            automake \
-            autopoint \
-            ccache \
-            cmake \
-            g++ \
-            gcc \
-            git \
-            lbzip2 \
-            libffi-dev \
-            libltdl-dev \
-            libssl-dev \
-            libtool \
-            make \
-            patch \
-            pkg-config \
-            unzip \
-            wget \
-            zip
-
-      - name: Install Python build tools
-        shell: bash
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          python -m pip install "Cython<3"
-          python -m pip install python-for-android==2026.05.09
-
-      - name: Check p4a
-        shell: bash
-        run: |
-          p4a --version
-          python --version
-          cython --version
-
-      - name: Prepare app
-        shell: bash
+      - name: Prepare CRM
         run: |
           cp app.py main.py
 
-      - name: Build APK
-        shell: bash
-        env:
-          PIP_NO_BUILD_ISOLATION: "1"
+      - name: Build APK with Docker
         run: |
-          p4a apk \
-            --private . \
-            --package com.mycrm.app \
-            --name "My Business CRM" \
-            --version 1.0 \
-            --bootstrap webview \
-            --requirements flask \
-            --arch arm64-v8a \
-            --android-api 33 \
-            --ndk-api 24 \
-            --ndk-version r28c \
-            --sdk-dir "$ANDROID_HOME" \
-            --ndk-dir "$ANDROID_HOME/ndk/28.2.13676358" \
-            --port 5000 \
-            --dist-name mycrm \
-            --debug
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/home/user/app" \
+            --workdir /home/user/app \
+            mycrm-p4a \
+            bash -lc '
+              . /venv/bin/activate
+              p4a apk \
+                --private /home/user/app \
+                --package com.mycrm.app \
+                --name "My Business CRM" \
+                --version 1.0 \
+                --bootstrap webview \
+                --requirements flask \
+                --arch arm64-v8a \
+                --port 5000 \
+                --debug
+            '
 
       - name: Find APK
-        shell: bash
         run: |
           echo "Searching for APK..."
           find . -type f -name "*.apk" -print
