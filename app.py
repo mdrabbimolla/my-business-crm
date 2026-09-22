@@ -4,9 +4,10 @@ from flask import Flask, request, redirect, session, render_template
 from database import get_db, init_db
 
 try:
-    from jnius import autoclass
+    from jnius import autoclass, cast
 except ImportError:
     autoclass = None
+    cast = None
 
 app = Flask(__name__)
 
@@ -17,7 +18,7 @@ init_db()
 
 
 def open_android_url(url):
-    if autoclass is None:
+    if autoclass is None or cast is None:
         return False
 
     try:
@@ -25,8 +26,10 @@ def open_android_url(url):
         Uri = autoclass("android.net.Uri")
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
 
-        intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        PythonActivity.mActivity.startActivity(intent)
+        current_activity = cast("android.app.Activity", PythonActivity.mActivity)
+        intent = Intent(Intent.ACTION_VIEW)
+        intent.setData(Uri.parse(url))
+        current_activity.startActivity(intent)
         return True
     except Exception:
         return False
