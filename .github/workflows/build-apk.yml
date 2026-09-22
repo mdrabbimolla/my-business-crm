@@ -41,27 +41,30 @@ jobs:
           test -f app.py
           cp app.py main.py
           test -s main.py
+          mkdir -p apk-output
           echo "main.py created successfully"
 
       - name: Build APK
         run: |
-          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm:ro"             --volume "/usr/local/lib/android/sdk:/opt/android-sdk:ro"             --workdir /home/user             --env ANDROIDSDK=/opt/android-sdk             --env ANDROID_HOME=/opt/android-sdk             --env ANDROID_SDK_ROOT=/opt/android-sdk             --env ANDROIDNDK=/home/user/.android/android-ndk             --env ANDROID_NDK_HOME=/home/user/.android/android-ndk             --env PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin:$PATH             kivy/python-for-android:latest             sh -c '
+          docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm:ro"             --volume "$GITHUB_WORKSPACE/apk-output:/output"             --volume "/usr/local/lib/android/sdk:/opt/android-sdk:ro"             --workdir /home/user             --env ANDROIDSDK=/opt/android-sdk             --env ANDROID_HOME=/opt/android-sdk             --env ANDROID_SDK_ROOT=/opt/android-sdk             --env ANDROIDNDK=/home/user/.android/android-ndk             --env ANDROID_NDK_HOME=/home/user/.android/android-ndk             --env PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin:$PATH             kivy/python-for-android:latest             sh -c '
               rm -rf /tmp/mycrm &&
               mkdir -p /tmp/mycrm &&
               cp -a /home/user/crm/. /tmp/mycrm/ &&
               chmod -R u+rwX /tmp/mycrm &&
               cd /tmp/mycrm &&
-              /home/user/app/venv/bin/p4a apk                 --private /tmp/mycrm                 --sdk-dir /opt/android-sdk                 --ndk-dir /home/user/.android/android-ndk                 --package com.mycrm.app                 --name "My Business CRM"                 --version 1.0                 --bootstrap webview                 --requirements flask                 --port 5000                 --arch arm64-v8a                 --android-api 35                 --ndk-api 24
+              /home/user/app/venv/bin/p4a apk                 --private /tmp/mycrm                 --sdk-dir /opt/android-sdk                 --ndk-dir /home/user/.android/android-ndk                 --package com.mycrm.app                 --name "My Business CRM"                 --version 1.0                 --bootstrap webview                 --requirements flask                 --port 5000                 --arch arm64-v8a                 --android-api 35                 --ndk-api 24 &&
+              cp -v /tmp/mycrm/*.apk /output/
             '
 
       - name: Find APK
         run: |
           echo "Searching for APK..."
-          find . -type f -name "*.apk" -print
+          find apk-output -type f -name "*.apk" -print
+          test -n "$(find apk-output -type f -name "*.apk" -print -quit)"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: my-business-crm-apk
-          path: "**/*.apk"
+          path: "apk-output/*.apk"
           if-no-files-found: error
