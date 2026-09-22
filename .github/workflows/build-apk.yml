@@ -21,18 +21,9 @@ jobs:
           remove-codeql: true
           remove-docker-images: true
 
-      - name: Checkout python-for-android
-        uses: actions/checkout@v4
-        with:
-          repository: kivy/python-for-android
-          ref: develop
-          path: python-for-android
-          fetch-depth: 1
-
-      - name: Build python-for-android Docker image
-        working-directory: python-for-android
+      - name: Pull official python-for-android image
         run: |
-          docker build --progress=plain --tag mycrm-p4a .
+          docker pull kivy/python-for-android:latest
 
       - name: Prepare CRM
         run: |
@@ -43,7 +34,7 @@ jobs:
           docker run --rm \
             --volume "$GITHUB_WORKSPACE:/home/user/app" \
             --workdir /home/user/app \
-            mycrm-p4a \
+            kivy/python-for-android:latest \
             sh -c '
               . venv/bin/activate &&
               p4a apk \
