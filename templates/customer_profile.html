@@ -318,14 +318,13 @@
         </div>
         <div class="buttons">
 
-            <a href="tel:{{ customer['phone'] }}">
+            <a href="/android-call?phone={{ customer['phone']|urlencode }}&next=/customer/{{ customer['id'] }}">
                 📞 Call
             </a>
 
             <a
                 class="whatsapp"
-                href="https://wa.me/88{{ customer['phone'] }}"
-                target="_blank"
+                href="/android-whatsapp?phone={{ customer['phone']|urlencode }}&next=/customer/{{ customer['id'] }}"
             >
                 💬 WhatsApp
             </a>
