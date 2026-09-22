@@ -25,10 +25,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kivy/python-for-android
-          ref: 2026.05.09
+          ref: develop
           path: python-for-android
+          fetch-depth: 1
 
-      - name: Build p4a Docker image
+      - name: Build python-for-android Docker image
         working-directory: python-for-android
         run: |
           docker build --tag mycrm-p4a .
@@ -37,14 +38,14 @@ jobs:
         run: |
           cp app.py main.py
 
-      - name: Build APK with Docker
+      - name: Build APK
         run: |
           docker run --rm \
             --volume "$GITHUB_WORKSPACE:/home/user/app" \
             --workdir /home/user/app \
             mycrm-p4a \
-            bash -lc '
-              . /venv/bin/activate
+            sh -c '
+              . venv/bin/activate &&
               p4a apk \
                 --private /home/user/app \
                 --package com.mycrm.app \
@@ -52,9 +53,8 @@ jobs:
                 --version 1.0 \
                 --bootstrap webview \
                 --requirements flask \
-                --arch arm64-v8a \
                 --port 5000 \
-                --debug
+                --arch arm64-v8a
             '
 
       - name: Find APK
