@@ -83,7 +83,7 @@ jobs:
       - name: Build APK
         shell: bash
         env:
-          P4A_CYTHON: cython
+          PIP_NO_BUILD_ISOLATION: "1"
         run: |
           p4a apk \
             --private . \
