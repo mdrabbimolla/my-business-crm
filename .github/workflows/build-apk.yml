@@ -45,8 +45,8 @@ jobs:
         run: |
           cp app.py main.py
 
-           - name: Build APK
-             run: |
+      - name: Build APK
+        run: |
           p4a apk \
             --private . \
             --package com.mycrm.app \
