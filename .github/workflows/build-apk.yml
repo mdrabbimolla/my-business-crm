@@ -39,7 +39,13 @@ jobs:
 
       - name: Prepare CRM
         run: |
-          cp app.py main.py
+          echo "Workspace: $GITHUB_WORKSPACE"
+          pwd
+          git status --short
+          git ls-tree --name-only HEAD | head -50
+          git show HEAD:app.py > main.py
+          test -s main.py
+          echo "main.py created successfully"
 
       - name: Build APK
         run: |
