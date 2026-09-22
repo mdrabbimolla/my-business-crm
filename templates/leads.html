@@ -104,7 +104,7 @@
 
         .info {
             margin: 6px 0;
-            font-size: 14px;
+            font-size: 11px;
         }
 
         .status {
@@ -125,19 +125,19 @@
         }
 
         .action-btn {
-            min-height: 58px;
+            min-height: 48px;
             display: flex;
             align-items: center;
             justify-content: center;
             text-decoration: none;
             text-align: center;
-            padding: 9px 6px;
-            border-radius: 13px;
+            padding: 6px 5px;
+            border-radius: 10px;
             font-weight: 800;
             font-size: 14px;
             line-height: 1.15;
             border: 1px solid transparent;
-            box-shadow: 0 3px 8px rgba(0,0,0,0.08);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.07);
             transition: transform 0.15s ease;
         }
 
@@ -177,8 +177,8 @@
 
         .action-icon {
             display: block;
-            font-size: 22px;
-            margin-bottom: 3px;
+            font-size: 18px;
+            margin-bottom: 1px;
         }
 
         .empty {
@@ -273,7 +273,7 @@
     }
 
     .action-btn {
-        min-height: 58px;
+        min-height: 48px;
         padding: 8px 4px;
         font-size: 12px;
     }
@@ -370,10 +370,24 @@
                         </span>
                     </div>
 
-                    {% if lead['notes'] %}
+                    {% if lead['latest_note'] %}
                         <div class="info">
-                            📝 <strong>Notes:</strong>
+                            📝 <strong>Latest Note:</strong>
+                            {{ lead['latest_note'] }}
+                            <span style="color:#64748b;font-size:11px;">({{ lead['latest_note_date'] }})</span>
+                            <a href="/lead-notes/{{ lead['id'] }}"
+                               style="margin-left:6px;color:#173b70;font-weight:bold;text-decoration:none;">
+                               View history
+                            </a>
+                        </div>
+                    {% elif lead['notes'] %}
+                        <div class="info">
+                            📝 <strong>Latest Note:</strong>
                             {{ lead['notes'] }}
+                            <a href="/lead-notes/{{ lead['id'] }}"
+                               style="margin-left:6px;color:#173b70;font-weight:bold;text-decoration:none;">
+                               View history
+                            </a>
                         </div>
                     {% endif %}
 
@@ -395,7 +409,7 @@
                         >
                             <span>
                                 <span class="action-icon">💬</span>
-                                WhatsApp Business
+                                WhatsApp
                             </span>
                         </a>
 
