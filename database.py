@@ -164,6 +164,29 @@ def init_db():
         """, ("ARKAM MC PARK",))
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_lead_id ON lead_notes(lead_id, id DESC)")
+    conn.execute("""
+        INSERT INTO lead_notes (lead_id, note, note_date)
+        SELECT id, notes, substr(created_at, 1, 10)
+        FROM leads
+        WHERE notes IS NOT NULL
+        AND TRIM(notes) != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM lead_notes ln WHERE ln.lead_id = leads.id
+        )
+    """)
+
+    conn.execute("""
+        INSERT INTO followups
+        (lead_id, name, phone, follow_up_date, note, status)
+        SELECT leads.id, leads.name, leads.phone, leads.follow_up_date, COALESCE(leads.notes, ''), 'New'
+        FROM leads
+        WHERE leads.follow_up_date IS NOT NULL
+        AND TRIM(leads.follow_up_date) != ''
+        AND NOT EXISTS (
+            SELECT 1 FROM followups f WHERE f.lead_id = leads.id
+        )
+    """)
+
     conn.execute("CREATE INDEX IF NOT EXISTS idx_followups_lead_id ON followups(lead_id)")
     conn.commit()
     conn.close()
