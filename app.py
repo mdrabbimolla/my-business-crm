@@ -15,8 +15,8 @@ def login():
 
     if request.method == "POST":
 
-        username = request.form.get("username")
-        password = request.form.get("password")
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
 
         conn = get_db()
 
@@ -160,9 +160,8 @@ def add_user():
         active = request.form.get("active", "1")
 
         if not username or not password:
+            conn.close()
             return "Username and password are required"
-
-        conn = get_db()
 
         existing_user = conn.execute(
             "SELECT id FROM users WHERE username = ?",
