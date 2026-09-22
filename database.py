@@ -71,6 +71,17 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS lead_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lead_id INTEGER NOT NULL,
+            note TEXT NOT NULL,
+            note_date TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (lead_id) REFERENCES leads(id)
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
@@ -124,6 +135,7 @@ def init_db():
     add_column_if_missing("leads", "assigned_to", "TEXT")
     add_column_if_missing("leads", "visit_date", "TEXT")
     add_column_if_missing("leads", "visit_time", "TEXT")
+    add_column_if_missing("followups", "lead_id", "INTEGER")
 
     # Add user management columns if they do not exist.
     add_column_if_missing("users", "name", "TEXT")
@@ -151,6 +163,8 @@ def init_db():
             VALUES (1, ?)
         """, ("ARKAM MC PARK",))
 
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_lead_id ON lead_notes(lead_id, id DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_followups_lead_id ON followups(lead_id)")
     conn.commit()
     conn.close()
 
