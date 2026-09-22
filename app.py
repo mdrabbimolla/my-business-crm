@@ -156,27 +156,12 @@ def android_whatsapp():
 
     whatsapp_url = "https://wa.me/" + phone
 
-    # First try the normal WhatsApp app.
+    # Only WhatsApp Business is allowed for this CRM.
     opened = open_android_url(
         whatsapp_url,
         action="VIEW",
-        package_name="com.whatsapp"
+        package_name="com.whatsapp.w4b"
     )
-
-    # Then try WhatsApp Business.
-    if not opened:
-        opened = open_android_url(
-            whatsapp_url,
-            action="VIEW",
-            package_name="com.whatsapp.w4b"
-        )
-
-    # Final fallback: let Android choose a browser/app.
-    if not opened:
-        opened = open_android_url(
-            whatsapp_url,
-            action="VIEW"
-        )
 
     if not opened:
         return """
