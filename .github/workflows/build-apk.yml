@@ -65,33 +65,33 @@ jobs:
               cp -a /home/user/crm/. /tmp/mycrm/ &&
               chmod -R u+rwX /tmp/mycrm &&
               cat > /tmp/gradle-init.gradle <<'GRADLE'
-allprojects {
-    buildscript {
-        repositories {
-            maven { url "https://maven.aliyun.com/repository/central" }
-            maven { url "https://repo.huaweicloud.com/repository/maven/" }
-            google()
-            mavenCentral()
-        }
-    }
-    repositories {
-        maven { url "https://maven.aliyun.com/repository/central" }
-        maven { url "https://repo.huaweicloud.com/repository/maven/" }
-        google()
-        mavenCentral()
-    }
-}
-settingsEvaluated { settings ->
-    settings.pluginManagement.repositories {
-        maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
-        maven { url "https://maven.aliyun.com/repository/central" }
-        maven { url "https://repo.huaweicloud.com/repository/maven/" }
-        google()
-        gradlePluginPortal()
-        mavenCentral()
-    }
-}
-GRADLE
+              allprojects {
+                  buildscript {
+                      repositories {
+                          maven { url "https://maven.aliyun.com/repository/central" }
+                          maven { url "https://repo.huaweicloud.com/repository/maven/" }
+                          google()
+                          mavenCentral()
+                      }
+                  }
+                  repositories {
+                      maven { url "https://maven.aliyun.com/repository/central" }
+                      maven { url "https://repo.huaweicloud.com/repository/maven/" }
+                      google()
+                      mavenCentral()
+                  }
+              }
+              settingsEvaluated { settings ->
+                  settings.pluginManagement.repositories {
+                      maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+                      maven { url "https://maven.aliyun.com/repository/central" }
+                      maven { url "https://repo.huaweicloud.com/repository/maven/" }
+                      google()
+                      gradlePluginPortal()
+                      mavenCentral()
+                  }
+              }
+              GRADLE
               export GRADLE_OPTS="-I /tmp/gradle-init.gradle"
               cd /tmp/mycrm &&
               /home/user/app/venv/bin/p4a apk                 --private /tmp/mycrm                 --sdk-dir /opt/android-sdk                 --ndk-dir /home/user/.android/android-ndk                 --package com.mycrm.app                 --name "My Business CRM"                 --version 1.0.${{ github.run_number }}                 --bootstrap webview                 --requirements flask,pyjnius                 --permission android.permission.CALL_PHONE                 --port 5000                 --arch arm64-v8a                 --android-api 35                 --ndk-api 24 &&
