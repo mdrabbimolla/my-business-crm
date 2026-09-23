@@ -60,10 +60,39 @@ jobs:
       - name: Build APK
         run: |
           docker run --rm             --volume "$GITHUB_WORKSPACE:/home/user/crm:ro"             --volume "$GITHUB_WORKSPACE/apk-output:/output"             --volume "/usr/local/lib/android/sdk:/opt/android-sdk:ro"             --workdir /home/user             --env ANDROIDSDK=/opt/android-sdk             --env ANDROID_HOME=/opt/android-sdk             --env ANDROID_SDK_ROOT=/opt/android-sdk             --env ANDROIDNDK=/home/user/.android/android-ndk             --env ANDROID_NDK_HOME=/home/user/.android/android-ndk             --env PATH=/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/tools/bin:$PATH             kivy/python-for-android:latest             sh -c '
-              rm -rf /tmp/mycrm &&
+              rm -rf /tmp/mycrm /tmp/gradle-init.gradle &&
               mkdir -p /tmp/mycrm &&
               cp -a /home/user/crm/. /tmp/mycrm/ &&
               chmod -R u+rwX /tmp/mycrm &&
+              cat > /tmp/gradle-init.gradle <<'GRADLE'
+allprojects {
+    buildscript {
+        repositories {
+            maven { url "https://maven.aliyun.com/repository/central" }
+            maven { url "https://repo.huaweicloud.com/repository/maven/" }
+            google()
+            mavenCentral()
+        }
+    }
+    repositories {
+        maven { url "https://maven.aliyun.com/repository/central" }
+        maven { url "https://repo.huaweicloud.com/repository/maven/" }
+        google()
+        mavenCentral()
+    }
+}
+settingsEvaluated { settings ->
+    settings.pluginManagement.repositories {
+        maven { url "https://maven.aliyun.com/repository/gradle-plugin" }
+        maven { url "https://maven.aliyun.com/repository/central" }
+        maven { url "https://repo.huaweicloud.com/repository/maven/" }
+        google()
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+GRADLE
+              export GRADLE_OPTS="-I /tmp/gradle-init.gradle"
               cd /tmp/mycrm &&
               /home/user/app/venv/bin/p4a apk                 --private /tmp/mycrm                 --sdk-dir /opt/android-sdk                 --ndk-dir /home/user/.android/android-ndk                 --package com.mycrm.app                 --name "My Business CRM"                 --version 1.0.${{ github.run_number }}                 --bootstrap webview                 --requirements flask,pyjnius                 --permission android.permission.CALL_PHONE                 --port 5000                 --arch arm64-v8a                 --android-api 35                 --ndk-api 24 &&
               cp -v /tmp/mycrm/*.apk /output/
