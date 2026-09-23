@@ -2820,11 +2820,34 @@ def daily_report():
     new_leads_count = sum(
         1 for lead in talked_leads
         if (lead["created_at"] or "")[:10] == report_date
+        and (lead["previous_note_count"] or 0) == 0
     )
     followup_leads_count = sum(
         1 for lead in talked_leads
         if lead["follow_up_date"] == report_date
+        and (lead["previous_note_count"] or 0) > 0
     )
+    visit_list_query = """
+        SELECT leads.name, leads.phone, leads.visit_time, leads.visit_status,
+               projects.name AS project_name
+        FROM leads
+        LEFT JOIN projects ON projects.id = leads.project_id
+        WHERE leads.visit_date = ?
+    """
+    visit_list_params = [report_date]
+    if project_filter:
+        visit_list_query += " AND leads.project_id = ?"
+        visit_list_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        visit_list_query += " AND leads.assigned_to = ?"
+        visit_list_params.append(current_user["username"])
+    visit_list_query += " ORDER BY leads.visit_time ASC, leads.id DESC"
+    visit_list = conn.execute(visit_list_query, visit_list_params).fetchall()
+    completed_list_query = visit_list_query.replace(
+        "WHERE leads.visit_date = ?",
+        "WHERE leads.visit_status = 'Completed' AND leads.visit_completed_date = ?"
+    )
+    completed_list = conn.execute(completed_list_query, visit_list_params).fetchall()
 
     conn.close()
 
@@ -2839,7 +2862,9 @@ def daily_report():
         followup_leads_count=followup_leads_count,
         visits_scheduled=visits_scheduled,
         visits_completed=visits_completed,
-        cancelled_count=cancelled_count
+        cancelled_count=cancelled_count,
+        visit_list=visit_list,
+        completed_list=completed_list
     )
 
 
