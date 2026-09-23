@@ -7,22 +7,35 @@
 <style>
 body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172554}
 .header{background:linear-gradient(135deg,#172554,#173b70);color:white;padding:20px;border-bottom:3px solid #d4af37}
-.container{max-width:900px;margin:auto;padding:16px}
+.container{max-width:1000px;margin:auto;padding:16px}
 .card{background:white;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.07)}
 .filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;box-sizing:border-box}
 .btn{display:block;text-align:center;text-decoration:none;padding:12px;border-radius:9px;font-weight:bold;border:0;cursor:pointer}
-.primary{background:#173b70;color:white}.gold{background:#d4af37;color:#172554}.back{color:#173b70}
+.primary{background:#173b70;color:white}.gold{background:#d4af37;color:#172554}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
 .stat b{display:block;font-size:23px;margin-top:5px}
 .table-wrap{overflow:auto}
-table{width:100%;border-collapse:collapse;min-width:650px}
+table{width:100%;border-collapse:collapse;min-width:900px}
 th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;font-size:13px}
 th{background:#f8fafc}
 .note{max-width:360px;white-space:pre-wrap}
 .small{font-size:12px;color:#64748b}
+.print-only{display:none}
 @media(max-width:600px){.filters,.stats{grid-template-columns:1fr}.container{padding:12px}}
+@media print{
+    body{background:white;color:#000}
+    .no-print,.menu-button,.side-menu,.menu-overlay{display:none !important}
+    .header{background:white;color:#000;border-bottom:2px solid #000;padding:10px}
+    .container{max-width:none;padding:0}
+    .card{box-shadow:none;border:1px solid #bbb;border-radius:0;margin:0 0 8px;padding:10px}
+    .print-only{display:block}
+    .table-wrap{overflow:visible}
+    table{min-width:0;width:100%;font-size:10px}
+    th,td{font-size:10px;padding:6px}
+    .note{max-width:none}
+}
 </style>
 </head>
 <body>
@@ -30,31 +43,23 @@ th{background:#f8fafc}
 <div class="header"><h2 style="margin:0">📊 Daily Sales Report</h2></div>
 <div class="container">
 
-<div class="card">
+<div class="card no-print">
 <form method="GET" action="/daily-report" class="filters">
-<div>
-<label>📅 Report Date</label>
-<input type="date" name="date" value="{{ report_date }}">
-</div>
-<div>
-<label>🏗️ Project</label>
-<select name="project_id">
-<option value="">All Projects</option>
-{% for project in projects %}
-<option value="{{ project['id'] }}" {% if project_filter == project['id']|string %}selected{% endif %}>{{ project['name'] }}</option>
-{% endfor %}
-</select>
-</div>
-<div>
-<button class="btn primary" type="submit">🔎 Generate Report</button>
-</div>
-<div>
-<a class="btn gold" href="/leads">← Back to Leads</a>
-</div>
+<div><label>📅 Report Date</label><input type="date" name="date" value="{{ report_date }}"></div>
+<div><label>🏗️ Project</label><select name="project_id"><option value="">All Projects</option>{% for project in projects %}<option value="{{ project['id'] }}" {% if project_filter == project['id']|string %}selected{% endif %}>{{ project['name'] }}</option>{% endfor %}</select></div>
+<div><button class="btn primary" type="submit">🔎 Generate Report</button></div>
+<div><a class="btn gold" href="/leads">← Back to Leads</a></div>
 </form>
 </div>
 
+<div class="card no-print" style="display:flex;gap:10px;flex-wrap:wrap">
+<button class="btn gold" type="button" onclick="window.print()">🖨️ Print Report</button>
+</div>
+
+<div id="printReport">
 <div class="card">
+<div class="print-only" style="font-size:18px;font-weight:bold;margin-bottom:8px">My Business CRM — Daily Sales Report</div>
+<div style="font-weight:bold;margin-bottom:10px">📅 Date: {{ report_date }}{% if project_filter %} — Project: {% for project in projects %}{% if project['id']|string == project_filter %}{{ project['name'] }}{% endif %}{% endfor %}{% endif %}</div>
 <div class="stats">
 <div class="stat">🗣️ কথা হয়েছে<b>{{ talked_count }}</b></div>
 <div class="stat">🆕 নতুন Lead<b>{{ new_leads_count }}</b></div>
@@ -66,28 +71,21 @@ th{background:#f8fafc}
 </div>
 
 <div class="card">
-<a class="btn gold" href="/daily-report-jpeg?date={{ report_date }}{% if project_filter %}&project_id={{ project_filter }}{% endif %}">🖼️ Download This Report as JPEG</a>
-<p class="small" style="margin-bottom:0">JPEG-এ শুধু এই তারিখের update notes, নাম, masked phone ও project থাকবে। পুরো phone number কখনো থাকবে না।</p>
-</div>
-
-<div class="card" id="reportCard">
-<h3 style="margin-top:0">📋 {{ report_date }} — কথা বলা Lead</h3>
+<h3 style="margin-top:0">📋 Talked Leads</h3>
 {% if talked_leads %}
 <div class="table-wrap">
 <table id="reportTable">
-<thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Type</th><th>Updated Note</th></tr></thead>
+<thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Type</th><th>Visit Set</th><th>Complete Visit</th><th>Updated Note</th></tr></thead>
 <tbody>
 {% for lead in talked_leads %}
 <tr>
 <td>{{ loop.index }}</td>
 <td>{{ lead['name'] or 'Name not added' }}</td>
-<td>{{ lead['phone'][:5] if lead['phone'] else '' }}×××{{ lead['phone'][-3:] if lead['phone'] else '' }}</td>
+<td>{% set local_phone = lead['phone'][3:] if lead['phone'] and lead['phone'].startswith('+88') else (lead['phone'] or '') %}{{ local_phone[:5] }}{% if local_phone|length >= 8 %}×××{{ local_phone[-3:] }}{% endif %}</td>
 <td>{{ lead['project_name'] or 'Unassigned' }}</td>
-<td>
-{% if (lead['created_at'] or '')[:10] == report_date and (lead['previous_note_count'] or 0) == 0 %}New Lead
-{% elif lead['follow_up_date'] == report_date %}Follow-up
-{% else %}Conversation{% endif %}
-</td>
+<td>{% if (lead['created_at'] or '')[:10] == report_date and (lead['previous_note_count'] or 0) == 0 %}New Lead{% elif lead['follow_up_date'] == report_date %}Follow-up{% else %}Conversation{% endif %}</td>
+<td>{% if lead['visit_date'] %}{{ lead['visit_date'] }}{% if lead['visit_time'] %} {{ lead['visit_time'] }}{% endif %}{% else %}—{% endif %}</td>
+<td>{% if lead['visit_status'] == 'Completed' and lead['visit_completed_date'] == report_date %}Yes{% else %}—{% endif %}</td>
 <td class="note">{{ lead['note'] }}</td>
 </tr>
 {% endfor %}
@@ -98,27 +96,8 @@ th{background:#f8fafc}
 <div style="text-align:center;color:#64748b;padding:25px">📭 এই তারিখ/Project-এর জন্য কোনো update note পাওয়া যায়নি।</div>
 {% endif %}
 </div>
-
-<div class="card">
-<h3 style="margin-top:0">📍 Visit Set List ({{ visits_scheduled }})</h3>
-{% if visit_list %}
-<div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Time</th><th>Status</th></tr></thead><tbody>
-{% for visit in visit_list %}<tr><td>{{ loop.index }}</td><td>{{ visit['name'] or 'Name not added' }}</td><td>{{ visit['phone'] }}</td><td>{{ visit['project_name'] or 'Unassigned' }}</td><td>{{ visit['visit_time'] or '-' }}</td><td>{{ visit['visit_status'] or 'Planned' }}</td></tr>{% endfor %}
-</tbody></table></div>
-{% else %}<p class="small">আজ কোনো Visit Set নেই।</p>{% endif %}
 </div>
-
-<div class="card">
-<h3 style="margin-top:0">✅ Visit Completed List ({{ visits_completed }})</h3>
-{% if completed_list %}
-<div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Time</th></tr></thead><tbody>
-{% for visit in completed_list %}<tr><td>{{ loop.index }}</td><td>{{ visit['name'] or 'Name not added' }}</td><td>{{ visit['phone'] }}</td><td>{{ visit['project_name'] or 'Unassigned' }}</td><td>{{ visit['visit_time'] or '-' }}</td></tr>{% endfor %}
-</tbody></table></div>
-{% else %}<p class="small">আজ কোনো Visit Completed নেই।</p>{% endif %}
 </div>
-
-</div>
-
 <script></script>
 </body>
 </html>
