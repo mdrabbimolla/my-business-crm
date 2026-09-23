@@ -149,6 +149,16 @@
                 value="{{ lead['visit_time'] or '' }}"
             >
 
+            <label>📌 Visit Status</label>
+
+            <select
+                name="visit_status"
+                style="width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px;"
+            >
+                <option value="Planned" {% if (lead['visit_status'] or 'Planned') == 'Planned' %}selected{% endif %}>Planned</option>
+                <option value="Completed" {% if lead['visit_status'] == 'Completed' %}selected{% endif %}>Completed</option>
+                <option value="Cancelled" {% if lead['visit_status'] == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
 
             <button type="submit">
                 💾 Save Visit
