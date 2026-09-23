@@ -1,89 +1,57 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>My Business CRM</title>
-
     <style>
-        * {
-            box-sizing: border-box;
-        }
-
+        * { box-sizing: border-box; }
         body {
             margin: 0;
             font-family: Arial, sans-serif;
             background: #f4f6f8;
+            color: #172554;
         }
-
-.header {
-    background: linear-gradient(135deg, #172554, #173b70);
-    color: white;
-    padding: 18px;
-    border-bottom: 3px solid #d4af37;
-}
-
-.header h1 {
-    margin: 0;
-    font-size: 23px;
-    font-weight: 800;
-}
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
+        .header {
+            background: linear-gradient(135deg, #172554, #173b70);
+            color: white;
+            padding: 18px;
+            border-bottom: 3px solid #d4af37;
         }
-
+        .header h1 { margin: 0; font-size: 23px; }
         .container {
-            max-width: 600px;
+            max-width: 900px;
             margin: auto;
             padding: 18px;
         }
-
-.grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-}
-
-@media (max-width: 480px) {
-    .grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-}
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
         .card {
             background: white;
-            padding: 20px 12px;
+            padding: 18px 12px;
             border-radius: 14px;
             text-align: center;
+            text-decoration: none;
+            color: inherit;
             box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+            border: 1px solid #eef1f5;
         }
-
-        .card .icon {
-            font-size: 28px;
-        }
-
+        .card .icon { font-size: 28px; }
         .card h3 {
             margin: 8px 0 5px;
             font-size: 14px;
             color: #555;
         }
-
         .card .value {
-            font-size: 21px;
+            font-size: 22px;
             font-weight: bold;
-            color: #172554;
+            color: #173b70;
         }
-
-        .followups {
-            margin-top: 18px;
-        }
-
-        .followups h2 {
-            font-size: 19px;
-            color: #172554;
-        }
-
+        .followups { margin-top: 24px; }
+        .followups h2 { font-size: 19px; color: #172554; }
         .followup {
             background: white;
             padding: 15px;
@@ -91,215 +59,49 @@
             margin-bottom: 10px;
             box-shadow: 0 3px 10px rgba(0,0,0,0.06);
         }
-
-        .followup h3 {
-            margin: 0 0 6px;
-        }
-
-        .followup p {
-            margin: 5px 0;
-            color: #555;
-        }
-
-        .no-followup {
-            background: white;
-            padding: 18px;
-            border-radius: 12px;
-            text-align: center;
-            color: #777;
-        }
-
+        .followup h3 { margin: 0 0 6px; }
+        .followup p { margin: 5px 0; color: #555; }
         .menu {
-            margin-top: 18px;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
         }
-
         .menu a {
             display: block;
             background: white;
-            padding: 16px;
-            margin-bottom: 10px;
+            padding: 14px;
             border-radius: 12px;
             text-decoration: none;
             color: #172554;
             font-weight: bold;
+            text-align: center;
             box-shadow: 0 3px 10px rgba(0,0,0,0.06);
         }
-
-        .add {
-            background: #172554 !important;
-            color: white !important;
-            text-align: center;
+        .logout {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 9px 14px;
+            background: #dc3545;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: bold;
         }
-.card {
-    background: white;
-    padding: 20px;
-    border-radius: 16px;
-    text-align: center;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
-    border: 1px solid #eef1f5;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
-}
-
-.card .icon {
-    width: 52px;
-    height: 52px;
-    margin: 0 auto 10px;
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #eef4ff;
-    font-size: 27px;
-}
-
-.card h3 {
-    margin: 8px 0 5px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #555;
-}
-
-.card .value {
-    font-size: 24px;
-    font-weight: 800;
-    color: #173b70;
-}
-.menu-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-top: 18px;
-}
-
-.menu-btn {
-    display: block;
-    padding: 17px 12px;
-    background: linear-gradient(135deg, #ffffff, #f8fafc);
-    color: #172554;
-    text-decoration: none;
-    text-align: center;
-    border-radius: 15px;
-    font-size: 15px;
-    font-weight: 700;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.07);
-    transition: all 0.2s ease;
-}
-
-.menu-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 7px 18px rgba(0,0,0,0.10);
-}
-
-.menu-btn:active {
-    transform: scale(0.97);
-}
-.menu-btn:active {
-    transform: scale(0.97);
-}
-
-@media (max-width: 480px) {
-    .menu-grid {
-        grid-template-columns: 1fr 1fr;
-    }
-}
-/* =========================
-   PC / DESKTOP VERSION
-   ========================= */
-
-@media (min-width: 900px) {
-
-    body {
-        background: #eef2f7;
-    }
-
-    .header {
-        padding: 28px 50px;
-    }
-
-    .header h1 {
-        font-size: 30px;
-    }
-
-    .container {
-        max-width: 1250px;
-        margin: 0 auto;
-        padding: 30px 40px;
-    }
-
-    .grid {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 20px;
-    }
-
-    .card {
-        padding: 25px 18px;
-        min-height: 150px;
-    }
-
-    .card .icon {
-        width: 58px;
-        height: 58px;
-        font-size: 30px;
-    }
-
-    .card h3 {
-        font-size: 16px;
-    }
-
-    .card .value {
-        font-size: 26px;
-    }
-
-    .menu-grid {
-        grid-template-columns: repeat(4, 1fr);
-        gap: 18px;
-        margin-top: 25px;
-    }
-
-    .menu-btn {
-        padding: 20px 15px;
-        font-size: 16px;
-    }
-
-    .followups {
-        margin-top: 30px;
-    }
-
-    .followups h2 {
-        font-size: 23px;
-    }
-
-    .followup {
-        padding: 20px;
-    }
-
-}
+        @media (max-width: 480px) {
+            .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+            .card { padding: 15px 8px; }
+            .card .value { font-size: 20px; }
+        }
     </style>
 </head>
-
 <body>
 
 {% include "menu.html" %}
 
 <div class="header">
     <h1>📊 My Business CRM</h1>
-<a href="/logout"
-   style="display:inline-block;
-          margin-top:12px;
-          padding:10px 16px;
-          background:#dc3545;
-          color:white;
-          text-decoration:none;
-          border-radius:8px;
-          font-weight:bold;">
-    🚪 Logout
-</a>
+    <a href="/logout" class="logout">🚪 Logout</a>
 </div>
 
 <div class="container">
@@ -309,359 +111,102 @@
         <div class="card">
             <div class="icon">👥</div>
             <h3>Total Customers</h3>
-            <div class="value">
-                {{ total_customers }}
-            </div>
+            <div class="value">{{ total_customers }}</div>
         </div>
 
         <div class="card">
             <div class="icon">💰</div>
             <h3>Total Sales</h3>
-            <div class="value">
-                ৳{{ "%.2f"|format(total_sales) }}
-            </div>
-        </div>
-<div class="card">
-    <div class="icon">💾</div>
-    <h3>Database Backup</h3>
-
-    <a href="/backup"
-       style="display:inline-block;
-              margin-top:10px;
-              padding:10px 18px;
-              background:#173b70;
-              color:white;
-              border-radius:8px;
-              text-decoration:none;
-              font-weight:bold;">
-        💾 Backup Now
-    </a>
-<a href="/restore"
-   style="display:inline-block;
-          margin-top:10px;
-          padding:10px 18px;
-          background:#777;
-          color:white;
-          border-radius:8px;
-          text-decoration:none;
-          font-weight:bold;">
-    🔄 Restore Database
-</a>
-</div>
-        <div class="card">
-            <div class="icon">💵</div>
-            <h3>Total Paid</h3>
-            <div class="value">
-                ৳{{ "%.2f"|format(total_paid) }}
-            </div>
+            <div class="value">৳{{ "%.2f"|format(total_sales) }}</div>
         </div>
 
-<div class="card">
-    <div class="icon">💳</div>
-    <h3>Total Payments</h3>
-    <div class="value">
-        ৳{{ "%.2f"|format(total_payments) }}
-    </div>
-</div>
-        <div class="card">
+        <a class="card" href="/visits">
+            <div class="icon">📍</div>
+            <h3>Visits</h3>
+            <div class="value">{{ visit_count }}</div>
+        </a>
+
+        <a class="card" href="/followups?date_filter=today">
+            <div class="icon">📅</div>
+            <h3>Today's Follow-up</h3>
+            <div class="value">{{ today_followup_count }}</div>
+        </a>
+
+        <a class="card" href="/followups?date_filter=missed">
             <div class="icon">🔴</div>
-            <h3>Total Due</h3>
-            <div class="value">
-                ৳{{ "%.2f"|format(total_due) }}
-            </div>
-        </div>
-        <div class="card">
-            <div class="icon">💸</div>
-            <h3>Total Expenses</h3>
-            <div class="value">
-                ৳{{ "%.2f"|format(total_expenses) }}
-            </div>
-        </div>
+            <h3>Missed Follow-up</h3>
+            <div class="value">{{ missed_followup_count }}</div>
+        </a>
+
+        <a class="card" href="/followups?date_filter=upcoming">
+            <div class="icon">🔜</div>
+            <h3>Upcoming Follow-up</h3>
+            <div class="value">{{ upcoming_followup_count }}</div>
+        </a>
+
+        <a class="card" href="/canceled">
+            <div class="icon">❌</div>
+            <h3>Cancelled Leads</h3>
+            <div class="value">{{ cancel_count }}</div>
+        </a>
 
         <div class="card">
-            <div class="icon">📈</div>
-            <h3>Net Profit</h3>
-            <div class="value">
-                ৳{{ "%.2f"|format(net_profit) }}
-            </div>
-        </div>
-<div class="card">
-    <a href="/followups?date_filter=today"
-       style="display:block; text-decoration:none; color:inherit;">
-
-        <div class="icon">📅</div>
-
-        <h3>Today's Follow-up</h3>
-
-        <div class="value">
-            {{ today_followup_count }}
+            <div class="icon">💾</div>
+            <h3>Database</h3>
+            <a href="/backup" style="display:block;margin-top:8px;padding:8px;background:#173b70;color:white;border-radius:7px;text-decoration:none;font-weight:bold;">Backup</a>
+            <a href="/restore" style="display:block;margin-top:7px;padding:8px;background:#777;color:white;border-radius:7px;text-decoration:none;font-weight:bold;">Restore</a>
         </div>
 
-    </a>
-</div>
-
-<div class="card">
-    <div class="icon">🔔</div>
-    <h3>Follow-up Alert</h3>
-<a href="/followups?date_filter=today"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>📅 Today: {{ today_followup_count }}</p>
-</a>
-
-<a href="/followups?date_filter=missed"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>🔴 Missed: {{ missed_followup_count }}</p>
-</a>
-
-<a href="/followups?date_filter=upcoming"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>🟢 Upcoming: {{ upcoming_followup_count }}</p>
-</a>
-
-</div>
-
-<div class="card">
-    <div class="icon">📊</div>
-    <h3>Follow-up Status</h3>
-<a href="/followups?status=Number%20Off"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>📵 Number Off: {{ number_off_count }}</p>
-</a>
-
-<a href="/followups?status=Not%20Received"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>📞 Not Received: {{ not_received_count }}</p>
-</a>
-
-<a href="/followups?status=Positive"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>😊 Positive: {{ positive_count }}</p>
-</a>
-
-<a href="/followups?status=Cancel"
-   style="display:block; text-decoration:none; color:inherit;">
-    <p>❌ Cancel: {{ cancel_count }}</p>
-</a>
-</div>
     </div>
 
-<div class="followups">
-    </div>
+    <div class="followups">
+        <h2>📅 Today's Follow-up</h2>
 
-<div class="followups">
+        {% if today_followups %}
+            {% for followup in today_followups %}
+            <div class="followup">
+                <h3>{{ followup['name'] }}</h3>
+                <p>📞 {{ followup['phone'] or 'No phone' }}</p>
+                <p>📝 {{ followup['note'] or 'No note' }}</p>
+                <p>📌 Status: <strong>{{ followup['status'] }}</strong></p>
 
-    <h2>📅 Today's Follow-up</h2>
+                {% if followup['phone'] %}
+                <div style="display:flex;gap:8px;margin-top:10px;">
+                    <a href="/android-call?phone={{ followup['phone']|urlencode }}"
+                       style="flex:1;padding:10px;background:#dbeafe;color:#1d4ed8;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">
+                        📞 Call
+                    </a>
+                    <a href="/android-whatsapp?phone={{ followup['phone']|urlencode }}"
+                       style="flex:1;padding:10px;background:#dcfce7;color:#15803d;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">
+                        💬 WhatsApp
+                    </a>
+                </div>
+                {% endif %}
 
-    {% if today_followups %}
-
-        {% for followup in today_followups %}
-
-        <div class="followup"
-             style="background:white;
-                    padding:15px;
-                    margin-bottom:12px;
-                    border-radius:12px;
-                    box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-
-            <h3 style="margin-top:0;">
-                {{ followup['name'] }}
-            </h3>
-
-            <p>📞 {{ followup['phone'] or 'No phone' }}</p>
-
-            <p>📝 {{ followup['note'] or 'No note' }}</p>
-
-            <p>📅 Follow-up: <strong>Today</strong></p>
-
-            <p>
-                <strong>📌 Status:</strong>
-                {{ followup['status'] }}
-            </p>
-
-            {% if followup['phone'] %}
-
-            <div style="display:flex; gap:10px;">
-
-                <a href="tel:{{ followup['phone'] }}"
-                   style="flex:1;
-                          padding:10px;
-                          background:#198754;
-                          color:white;
-                          text-align:center;
-                          text-decoration:none;
-                          border-radius:8px;
-                          font-weight:bold;">
-                    📞 Call
+                <a href="/edit-followup/{{ followup['id'] }}"
+                   style="display:block;margin-top:10px;padding:10px;background:#173b70;color:white;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">
+                    ✏️ Edit Follow-up
                 </a>
-
-                <a href="https://wa.me/88{{ followup['phone'] }}"
-                   target="_blank"
-                   style="flex:1;
-                          padding:10px;
-                          background:#25D366;
-                          color:white;
-                          text-align:center;
-                          text-decoration:none;
-                          border-radius:8px;
-                          font-weight:bold;">
-                    💬 WhatsApp
-                </a>
-
             </div>
-
-            {% endif %}
-
-            <a href="/edit-followup/{{ followup['id'] }}"
-               style="display:block;
-                      margin-top:10px;
-                      padding:11px;
-                      background:#173b70;
-                      color:white;
-                      text-align:center;
-                      text-decoration:none;
-                      border-radius:8px;
-                      font-weight:bold;">
-                ✏️ Edit Follow-up
-            </a>
-
-        </div>
-
-        {% endfor %}
-
-    {% else %}
-
-        <div style="background:white;
-                    padding:20px;
-                    border-radius:12px;
-                    text-align:center;
-                    color:#777;">
-            📭 আজকের কোনো Follow-up নেই।
-        </div>
-
-    {% endif %}
-
-</div>
-<div style="margin-top:25px;
-            background:white;
-            padding:18px;
-            border-radius:16px;
-            box-shadow:0 4px 14px rgba(0,0,0,0.08);">
-
-    <h2 style="margin:0 0 18px;
-               color:#173b70;
-               font-size:19px;">
-        📊 Business Overview
-    </h2>
-
-    <div style="margin-bottom:15px;">
-        <div style="display:flex;
-                    justify-content:space-between;
-                    margin-bottom:6px;">
-            <strong>💰 Sales</strong>
-            <span>৳{{ "%.2f"|format(total_sales) }}</span>
-        </div>
-
-        <div style="height:9px;
-                    background:#eef1f5;
-                    border-radius:10px;">
-            <div style="width:100%;
-                        height:100%;
-                        background:#173b70;
-                        border-radius:10px;">
+            {% endfor %}
+        {% else %}
+            <div class="followup" style="text-align:center;color:#777;">
+                📭 আজকের কোনো Follow-up নেই।
             </div>
-        </div>
+        {% endif %}
     </div>
 
-    <div style="margin-bottom:15px;">
-        <div style="display:flex;
-                    justify-content:space-between;
-                    margin-bottom:6px;">
-            <strong>💳 Paid</strong>
-            <span>৳{{ "%.2f"|format(total_paid) }}</span>
-        </div>
-
-        <div style="height:9px;
-                    background:#eef1f5;
-                    border-radius:10px;">
-            <div style="width:{{ ((total_paid / total_sales) * 100) if total_sales else 0 }}%;
-                        height:100%;
-                        background:#198754;
-                        border-radius:10px;">
-            </div>
-        </div>
-    </div>
-
-    <div style="margin-bottom:15px;">
-        <div style="display:flex;
-                    justify-content:space-between;
-                    margin-bottom:6px;">
-            <strong>🔴 Due</strong>
-            <span>৳{{ "%.2f"|format(total_due) }}</span>
-        </div>
-
-        <div style="height:9px;
-                    background:#eef1f5;
-                    border-radius:10px;">
-            <div style="width:{{ ((total_due / total_sales) * 100) if total_sales else 0 }}%;
-                        height:100%;
-                        background:#dc3545;
-                        border-radius:10px;">
-            </div>
-        </div>
-    </div>
-
-    <div style="margin-bottom:15px;">
-        <div style="display:flex;
-                    justify-content:space-between;
-                    margin-bottom:6px;">
-            <strong>💸 Expense</strong>
-            <span>৳{{ "%.2f"|format(total_expenses) }}</span>
-        </div>
-
-        <div style="height:9px;
-                    background:#eef1f5;
-                    border-radius:10px;">
-            <div style="width:{{ ((total_expenses / total_sales) * 100) if total_sales else 0 }}%;
-                        height:100%;
-                        background:#f0ad4e;
-                        border-radius:10px;">
-            </div>
-        </div>
-    </div>
-
-    <div>
-        <div style="display:flex;
-                    justify-content:space-between;
-                    margin-bottom:6px;">
-            <strong>📈 Net Profit</strong>
-            <span>৳{{ "%.2f"|format(net_profit) }}</span>
-        </div>
-
-        <div style="height:9px;
-                    background:#eef1f5;
-                    border-radius:10px;">
-            <div style="width:{{ ((net_profit / total_sales) * 100) if total_sales else 0 }}%;
-                        height:100%;
-                        background:#20c997;
-                        border-radius:10px;">
-            </div>
-        </div>
+    <div class="menu">
+        <a href="/add-lead">➕ Add Lead</a>
+        <a href="/leads">📞 Leads</a>
+        <a href="/customers">👥 Customers</a>
+        <a href="/projects">🏗️ Projects</a>
+        <a href="/followups">📅 Follow-ups</a>
+        <a href="/visits">📍 Visits</a>
+        <a href="/canceled">❌ Cancelled</a>
+        <a href="/reports">📊 Reports</a>
     </div>
 
 </div>
-<div class="menu">
-
-    <a class="add" href="/add-customer">
-        ➕ Add Customer
-    </a>
-
-    <a href="/customers">
-        👥 Customer List
-    </a>
-
-</div>
-
-</div>
-
 </body>
 </html>
