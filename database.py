@@ -152,6 +152,8 @@ def init_db():
     add_column_if_missing("leads", "assigned_to", "TEXT")
     add_column_if_missing("leads", "visit_date", "TEXT")
     add_column_if_missing("leads", "visit_time", "TEXT")
+    add_column_if_missing("leads", "visit_status", "TEXT DEFAULT 'Planned'")
+    add_column_if_missing("leads", "visit_completed_date", "TEXT")
     add_column_if_missing("followups", "lead_id", "INTEGER")
 
     # Add user management columns if they do not exist.
@@ -181,6 +183,9 @@ def init_db():
         """, ("ARKAM MC PARK",))
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_lead_id ON lead_notes(lead_id, id DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_date ON lead_notes(note_date, id DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_project ON leads(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_visit_status ON leads(visit_status, visit_completed_date)")
     conn.execute("""
         INSERT INTO lead_notes (lead_id, note, note_date)
         SELECT id, notes, substr(created_at, 1, 10)
