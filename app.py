@@ -2,7 +2,11 @@ from datetime import date
 from urllib.parse import quote
 import json
 import urllib.request
-from flask import Flask, request, redirect, session, render_template
+import os
+import io
+import uuid
+from flask import Flask, request, redirect, session, render_template, send_file
+from werkzeug.utils import secure_filename
 from database import get_db, init_db
 
 try:
@@ -117,6 +121,79 @@ def clean_phone(phone):
 
     return "+" + phone if phone else ""
 
+
+
+PROJECT_FILE_ROOT = os.path.join(os.getcwd(), "project_files")
+ALLOWED_PROJECT_FILE_EXTENSIONS = {"txt", "pdf", "jpg", "jpeg", "png"}
+
+def project_file_extension(filename):
+    return filename.rsplit(".", 1)[1].lower() if filename and "." in filename else ""
+
+def project_file_mime(filename):
+    return {
+        "txt": "text/plain",
+        "pdf": "application/pdf",
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+    }.get(project_file_extension(filename), "application/octet-stream")
+
+def ensure_project_file_dir(project_id):
+    path = os.path.join(PROJECT_FILE_ROOT, str(project_id))
+    os.makedirs(path, exist_ok=True)
+    return path
+
+def share_android_text(text_value):
+    if autoclass is None or cast is None:
+        return False
+    try:
+        Intent = autoclass("android.content.Intent")
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = cast("android.app.Activity", PythonActivity.mActivity)
+        intent = Intent(Intent.ACTION_SEND)
+        intent.setType("text/plain")
+        intent.putExtra(Intent.EXTRA_TEXT, text_value or "")
+        intent.setPackage("com.whatsapp.w4b")
+        activity.startActivity(Intent.createChooser(intent, "Send Project Text"))
+        return True
+    except Exception as exc:
+        print("TEXT SHARE ERROR:", exc)
+        return False
+
+def share_android_file(file_path, mime_type):
+    if autoclass is None or cast is None or not os.path.exists(file_path):
+        return False
+    try:
+        Intent = autoclass("android.content.Intent")
+        ContentValues = autoclass("android.content.ContentValues")
+        MediaStoreFiles = autoclass("android.provider.MediaStore$Files")
+        Environment = autoclass("android.os.Environment")
+        ClipData = autoclass("android.content.ClipData")
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = cast("android.app.Activity", PythonActivity.mActivity)
+        resolver = activity.getContentResolver()
+        values = ContentValues()
+        values.put("_display_name", os.path.basename(file_path))
+        values.put("mime_type", mime_type)
+        values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Project Files")
+        uri = resolver.insert(MediaStoreFiles.getContentUri("external"), values)
+        if uri is None:
+            return False
+        stream = resolver.openOutputStream(uri)
+        with open(file_path, "rb") as source:
+            stream.write(source.read())
+        stream.close()
+        intent = Intent(Intent.ACTION_SEND)
+        intent.setType(mime_type)
+        intent.putExtra(Intent.EXTRA_STREAM, uri)
+        intent.setClipData(ClipData.newRawUri("file", uri))
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        intent.setPackage("com.whatsapp.w4b")
+        activity.startActivity(Intent.createChooser(intent, "Send Project File"))
+        return True
+    except Exception as exc:
+        print("FILE SHARE ERROR:", exc)
+        return False
 
 def get_update_info():
     """Check the latest public GitHub Release for a newer APK."""
@@ -387,6 +464,33 @@ def add_user():
     conn.close()
 
     return render_template("add_user.html")
+
+
+@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
+def reset_password(user_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    admin = conn.execute("SELECT role FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not admin or admin["role"] != "Admin":
+        conn.close()
+        return "Access Denied"
+    if not user:
+        conn.close()
+        return "User not found"
+    if request.method == "POST":
+        new_password = request.form.get("new_password", "").strip()
+        confirm_password = request.form.get("confirm_password", "").strip()
+        if not new_password or new_password != confirm_password:
+            conn.close()
+            return "Password is empty or passwords do not match"
+        conn.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, user_id))
+        conn.commit()
+        conn.close()
+        return redirect("/users")
+    conn.close()
+    return render_template("reset_password.html", user=user)
 
 @app.route("/users")
 def users():
@@ -811,45 +915,130 @@ def edit_project(project_id):
     )
 
 
-@app.route("/delete-project/<int:project_id>")
+@app.route("/delete-project/<int:project_id>", methods=["GET", "POST"])
 def delete_project(project_id):
-
     if not session.get("logged_in"):
         return redirect("/")
-
     conn = get_db()
-
-    conn.execute(
-        "DELETE FROM projects WHERE id = ?",
-        (project_id,)
-    )
-
+    lead_count = conn.execute("SELECT COUNT(*) FROM leads WHERE project_id = ?", (project_id,)).fetchone()[0]
+    customer_count = conn.execute("SELECT COUNT(*) FROM customers WHERE project_id = ?", (project_id,)).fetchone()[0]
+    if lead_count or customer_count:
+        conn.execute("UPDATE projects SET status = 'Inactive' WHERE id = ?", (project_id,))
+    else:
+        conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
     conn.commit()
     conn.close()
-
     return redirect("/projects")
+
+
+@app.route("/project-files/<int:project_id>", methods=["GET", "POST"])
+def project_files(project_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    project = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if not project:
+        conn.close()
+        return "Project not found"
+    if request.method == "POST":
+        item_type = request.form.get("item_type", "file")
+        title = request.form.get("title", "").strip()
+        if item_type == "text":
+            text_content = request.form.get("text_content", "").strip()
+            if not title or not text_content:
+                conn.close()
+                return "Title and text are required"
+            conn.execute("INSERT INTO project_files (project_id,title,item_type,text_content,mime_type) VALUES (?,?, 'text',?, 'text/plain')", (project_id,title,text_content))
+            conn.commit()
+            conn.close()
+            return redirect(f"/project-files/{project_id}")
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename:
+            conn.close()
+            return "Please select a file"
+        safe_name = secure_filename(uploaded.filename)
+        ext = project_file_extension(safe_name)
+        if ext not in ALLOWED_PROJECT_FILE_EXTENSIONS:
+            conn.close()
+            return "Only TXT, PDF, JPG, JPEG and PNG files are allowed"
+        folder = ensure_project_file_dir(project_id)
+        stored_name = uuid.uuid4().hex + "_" + safe_name
+        stored_path = os.path.join(folder, stored_name)
+        uploaded.save(stored_path)
+        conn.execute("INSERT INTO project_files (project_id,title,item_type,file_name,file_path,mime_type) VALUES (?,?, 'file',?,?,?)", (project_id,title or safe_name,safe_name,stored_path,project_file_mime(safe_name)))
+        conn.commit()
+        conn.close()
+        return redirect(f"/project-files/{project_id}")
+    files = conn.execute("SELECT * FROM project_files WHERE project_id = ? ORDER BY id DESC", (project_id,)).fetchall()
+    conn.close()
+    return render_template("project_files.html", project=project, files=files)
+
+@app.route("/project-file-download/<int:file_id>")
+def project_file_download(file_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
+    conn.close()
+    if not item or item["item_type"] != "file" or not item["file_path"] or not os.path.exists(item["file_path"]):
+        return "File not found"
+    return send_file(item["file_path"], as_attachment=True, download_name=item["file_name"], mimetype=item["mime_type"])
+
+@app.route("/delete-project-file/<int:file_id>", methods=["GET", "POST"])
+def delete_project_file(file_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
+    if not item:
+        conn.close()
+        return redirect("/projects")
+    project_id = item["project_id"]
+    if item["file_path"] and os.path.exists(item["file_path"]):
+        try:
+            os.remove(item["file_path"])
+        except OSError:
+            pass
+    conn.execute("DELETE FROM project_files WHERE id = ?", (file_id,))
+    conn.commit()
+    conn.close()
+    return redirect(f"/project-files/{project_id}")
+
+@app.route("/share-project-file/<int:file_id>")
+def share_project_file(file_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
+    conn.close()
+    if not item:
+        return "File not found"
+    ok = share_android_text(item["text_content"]) if item["item_type"] == "text" else share_android_file(item["file_path"], item["mime_type"])
+    return ("<h3>💬 WhatsApp খুলছে...</h3>" if ok else "<h3>⚠️ WhatsApp Share চালু করা যায়নি</h3>") + f"<a href='/project-files/{item['project_id']}'>← Back</a>"
 
 @app.route("/projects")
 def projects():
-
     if not session.get("logged_in"):
         return redirect("/")
-
     conn = get_db()
-
-    projects = conn.execute("""
-        SELECT *
-        FROM projects
-        WHERE status = 'Active'
-        ORDER BY name
-    """).fetchall()
-
+    projects = conn.execute("SELECT * FROM projects ORDER BY CASE WHEN status = 'Active' THEN 0 ELSE 1 END, name").fetchall()
     conn.close()
+    return render_template("projects.html", projects=projects)
 
-    return render_template(
-        "projects.html",
-        projects=projects
-    )
+@app.route("/toggle-project/<int:project_id>", methods=["GET", "POST"])
+def toggle_project(project_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    project = conn.execute("SELECT status FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if not project:
+        conn.close()
+        return "Project not found"
+    new_status = "Inactive" if project["status"] == "Active" else "Active"
+    conn.execute("UPDATE projects SET status = ? WHERE id = ?", (new_status, project_id))
+    conn.commit()
+    conn.close()
+    return redirect("/projects")
 
 @app.route("/add-project", methods=["GET", "POST"])
 def add_project():
@@ -1316,7 +1505,7 @@ def edit_payment(payment_id):
         "edit_payment.html",
         payment=payment
     )
-@app.route("/delete-payment/<int:payment_id>")
+@app.route("/delete-payment/<int:payment_id>", methods=["GET", "POST"])
 def delete_payment(payment_id):
 
     if not session.get("logged_in"):
@@ -1354,7 +1543,7 @@ def delete_payment(payment_id):
     conn.close()
 
     return redirect(f"/customer/{customer_id}")
-@app.route("/delete-customer/<int:customer_id>")
+@app.route("/delete-customer/<int:customer_id>", methods=["GET", "POST"])
 def delete_customer(customer_id):
 
     if not session.get("logged_in"):
@@ -1717,7 +1906,7 @@ def edit_followup(followup_id):
     )
 
 
-@app.route("/delete-followup/<int:followup_id>")
+@app.route("/delete-followup/<int:followup_id>", methods=["GET", "POST"])
 def delete_followup(followup_id):
 
     if not session.get("logged_in"):
@@ -1864,7 +2053,7 @@ def edit_expense(expense_id):
     )
 
 
-@app.route("/delete-expense/<int:expense_id>")
+@app.route("/delete-expense/<int:expense_id>", methods=["GET", "POST"])
 def delete_expense(expense_id):
 
     if not session.get("logged_in"):
@@ -2296,6 +2485,28 @@ def edit_lead(lead_id):
         current_role=current_user["role"]
     )
 
+
+@app.route("/delete-lead/<int:lead_id>", methods=["GET", "POST"])
+def delete_lead(lead_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    current_user = conn.execute("SELECT role, username FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
+    lead = conn.execute("SELECT assigned_to FROM leads WHERE id = ?", (lead_id,)).fetchone()
+    if not current_user or not lead:
+        conn.close()
+        return redirect("/leads")
+    if current_user["role"] == "Sales" and lead["assigned_to"] != current_user["username"]:
+        conn.close()
+        return "Access Denied"
+    conn.execute("DELETE FROM followups WHERE lead_id = ?", (lead_id,))
+    conn.execute("DELETE FROM lead_notes WHERE lead_id = ?", (lead_id,))
+    conn.execute("DELETE FROM canceled_leads WHERE lead_id = ?", (lead_id,))
+    conn.execute("DELETE FROM leads WHERE id = ?", (lead_id,))
+    conn.commit()
+    conn.close()
+    return redirect("/leads")
+
 @app.route("/set-visit/<int:lead_id>", methods=["GET", "POST"])
 def set_visit(lead_id):
 
@@ -2476,7 +2687,7 @@ def canceled():
     )
 
 
-@app.route("/delete-canceled/<int:canceled_id>")
+@app.route("/delete-canceled/<int:canceled_id>", methods=["GET", "POST"])
 def delete_canceled(canceled_id):
 
     if not session.get("logged_in"):
@@ -2536,7 +2747,8 @@ def daily_report():
             leads.visit_completed_date,
             projects.name AS project_name,
             ln.note,
-            ln.note_date
+            ln.note_date,
+            (SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id = ln.lead_id AND z.id < ln.id) AS previous_note_count
         FROM lead_notes ln
         JOIN leads ON leads.id = ln.lead_id
         LEFT JOIN projects ON projects.id = leads.project_id
@@ -2629,6 +2841,82 @@ def daily_report():
         visits_completed=visits_completed,
         cancelled_count=cancelled_count
     )
+
+
+@app.route("/daily-report-jpeg")
+def daily_report_jpeg():
+    if not session.get("logged_in"):
+        return redirect("/")
+    report_date = request.args.get("date") or date.today().isoformat()
+    project_filter = request.args.get("project_id", "").strip()
+    conn = get_db()
+    current_user = conn.execute("SELECT * FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
+    if not current_user:
+        conn.close()
+        return "User not found"
+    params = [report_date, report_date]
+    query = """SELECT leads.name, leads.phone, leads.created_at, leads.follow_up_date, projects.name AS project_name, ln.note,
+                      (SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id = ln.lead_id AND z.id < ln.id) AS previous_note_count
+               FROM lead_notes ln JOIN leads ON leads.id = ln.lead_id
+               LEFT JOIN projects ON projects.id = leads.project_id
+               WHERE ln.note_date = ?
+                 AND ln.id = (SELECT MAX(x.id) FROM lead_notes x WHERE x.lead_id = ln.lead_id AND x.note_date = ?)"""
+    if project_filter:
+        query += " AND leads.project_id = ?"
+        params.append(project_filter)
+    if current_user["role"] == "Sales":
+        query += " AND leads.assigned_to = ?"
+        params.append(current_user["username"])
+    query += " ORDER BY projects.name, leads.id DESC"
+    rows = conn.execute(query, params).fetchall()
+    visit_params = [report_date]
+    visit_query = "SELECT name, phone, visit_time, visit_status FROM leads WHERE visit_date = ?"
+    if project_filter:
+        visit_query += " AND project_id = ?"
+        visit_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        visit_query += " AND assigned_to = ?"
+        visit_params.append(current_user["username"])
+    visit_rows = conn.execute(visit_query + " ORDER BY visit_time, id DESC", visit_params).fetchall()
+    completed_params = [report_date]
+    completed_query = "SELECT name, phone, visit_time FROM leads WHERE visit_status = 'Completed' AND visit_completed_date = ?"
+    if project_filter:
+        completed_query += " AND project_id = ?"
+        completed_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        completed_query += " AND assigned_to = ?"
+        completed_params.append(current_user["username"])
+    completed_rows = conn.execute(completed_query + " ORDER BY visit_time, id DESC", completed_params).fetchall()
+    conn.close()
+    new_count = sum(1 for r in rows if (r["created_at"] or "")[:10] == report_date and (r["previous_note_count"] or 0) == 0)
+    follow_count = sum(1 for r in rows if r["follow_up_date"] == report_date and (r["previous_note_count"] or 0) > 0)
+    from PIL import Image, ImageDraw, ImageFont
+    height = max(900, 260 + len(rows) * 105 + (len(visit_rows) + len(completed_rows)) * 70)
+    image = Image.new("RGB", (1400, height), "white")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    y = 35
+    draw.text((40, y), "My Business CRM - Daily Sales Report", fill="#172554", font=font); y += 35
+    draw.text((40, y), f"Date: {report_date}", fill="#475569", font=font); y += 28
+    draw.text((40, y), f"Talked: {len(rows)} | New Lead: {new_count} | Follow-up: {follow_count} | Visit Set: {len(visit_rows)} | Completed: {len(completed_rows)}", fill="#173b70", font=font); y += 40
+    draw.text((40, y), "LEADS", fill="#173b70", font=font); y += 25
+    for i, row in enumerate(rows, 1):
+        phone = row["phone"] or ""
+        local = phone[3:] if phone.startswith("+88") else phone
+        masked = local[:5] + "×××" + local[-3:] if len(local) >= 8 else local
+        typ = "New Lead" if (row["created_at"] or "")[:10] == report_date and (row["previous_note_count"] or 0) == 0 else ("Follow-up" if row["follow_up_date"] == report_date else "Conversation")
+        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {masked} | {row['project_name'] or 'Unassigned'} | {typ}", fill="#172554", font=font); y += 20
+        draw.text((75, y), "Note: " + (row["note"] or "").replace("\n", " ")[:180], fill="#475569", font=font); y += 42
+    y += 10; draw.text((40, y), "VISITS SET", fill="#173b70", font=font); y += 25
+    for i, row in enumerate(visit_rows, 1):
+        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {row['phone'] or ''} | {row['visit_time'] or 'No time'} | {row['visit_status'] or 'Planned'}", fill="#172554", font=font); y += 24
+    y += 10; draw.text((40, y), "VISITS COMPLETED", fill="#173b70", font=font); y += 25
+    for i, row in enumerate(completed_rows, 1):
+        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {row['phone'] or ''} | {row['visit_time'] or 'No time'}", fill="#172554", font=font); y += 24
+    output = io.BytesIO()
+    image.save(output, format="JPEG", quality=92)
+    output.seek(0)
+    return send_file(output, mimetype="image/jpeg", as_attachment=True, download_name=f"daily-sales-report-{report_date}.jpg")
 
 @app.route("/monthly-report")
 def monthly_report():
