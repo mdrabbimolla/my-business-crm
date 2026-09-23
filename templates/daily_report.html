@@ -66,7 +66,7 @@ th{background:#f8fafc}
 </div>
 
 <div class="card">
-<button class="btn gold" onclick="downloadJpeg()">🖼️ Download This Report as JPEG</button>
+<a class="btn gold" href="/daily-report-jpeg?date={{ report_date }}{% if project_filter %}&project_id={{ project_filter }}{% endif %}">🖼️ Download This Report as JPEG</a>
 <p class="small" style="margin-bottom:0">JPEG-এ শুধু এই তারিখের update notes, নাম, masked phone ও project থাকবে। পুরো phone number কখনো থাকবে না।</p>
 </div>
 
@@ -84,7 +84,7 @@ th{background:#f8fafc}
 <td>{{ lead['phone'][:5] if lead['phone'] else '' }}×××{{ lead['phone'][-3:] if lead['phone'] else '' }}</td>
 <td>{{ lead['project_name'] or 'Unassigned' }}</td>
 <td>
-{% if (lead['created_at'] or '')[:10] == report_date %}New Lead
+{% if (lead['created_at'] or '')[:10] == report_date and (lead['previous_note_count'] or 0) == 0 %}New Lead
 {% elif lead['follow_up_date'] == report_date %}Follow-up
 {% else %}Conversation{% endif %}
 </td>
@@ -101,113 +101,6 @@ th{background:#f8fafc}
 
 </div>
 
-<script>
-function wrapText(ctx, text, maxWidth) {
-    const words = String(text || '').split(/\s+/);
-    const lines = [];
-    let line = '';
-    for (const word of words) {
-        const test = line ? line + ' ' + word : word;
-        if (ctx.measureText(test).width > maxWidth && line) {
-            lines.push(line);
-            line = word;
-        } else {
-            line = test;
-        }
-    }
-    if (line) lines.push(line);
-    return lines.length ? lines : [''];
-}
-
-function downloadJpeg() {
-    const table = document.getElementById('reportTable');
-    if (!table) {
-        alert('এই রিপোর্টে কোনো update note নেই।');
-        return;
-    }
-
-    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
-        Array.from(tr.children).map(td => td.innerText.trim())
-    );
-
-    const width = 1400;
-    const margin = 45;
-    const lineH = 34;
-    const rowPad = 18;
-    const colWidths = [55, 230, 190, 220, 150, 420];
-
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx.font = '24px Arial';
-
-    let totalHeight = 190;
-    const rowHeights = [];
-
-    rows.forEach(row => {
-        let maxLines = 1;
-        row.forEach((cell, i) => {
-            const lines = wrapText(ctx, cell, colWidths[i] - 20);
-            maxLines = Math.max(maxLines, lines.length);
-        });
-        const h = Math.max(58, maxLines * lineH + rowPad);
-        rowHeights.push(h);
-        totalHeight += h;
-    });
-
-    canvas.width = width;
-    canvas.height = Math.min(Math.max(totalHeight, 500), 20000);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-
-    ctx.fillStyle = '#172554';
-    ctx.font = 'bold 34px Arial';
-    ctx.fillText('My Business CRM - Daily Sales Report', margin, 55);
-
-    ctx.font = '24px Arial';
-    ctx.fillStyle = '#475569';
-    ctx.fillText('Date: {{ report_date }}{% if project_filter %} | Project filtered{% endif %}', margin, 95);
-
-    ctx.font = 'bold 22px Arial';
-    ctx.fillStyle = '#173b70';
-    ctx.fillText('Talked: {{ talked_count }}   New: {{ new_leads_count }}   Follow-up: {{ followup_leads_count }}   Visit Set: {{ visits_scheduled }}   Completed: {{ visits_completed }}', margin, 135);
-
-    let y = 170;
-    const headers = ['#','Name','Phone','Project','Type','Updated Note'];
-    let x = margin;
-    ctx.fillStyle = '#173b70';
-    ctx.fillRect(margin, y, width - margin*2, 48);
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 20px Arial';
-    headers.forEach((h,i) => { ctx.fillText(h, x+10, y+31); x += colWidths[i]; });
-
-    y += 48;
-    ctx.font = '20px Arial';
-
-    rows.forEach((row, ri) => {
-        const h = rowHeights[ri];
-        x = margin;
-        ctx.fillStyle = ri % 2 === 0 ? '#f8fafc' : '#ffffff';
-        ctx.fillRect(margin, y, width - margin*2, h);
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.strokeRect(margin, y, width - margin*2, h);
-
-        row.forEach((cell,i) => {
-            ctx.fillStyle = '#172554';
-            const lines = wrapText(ctx, cell, colWidths[i]-20);
-            lines.slice(0, Math.floor((h-12)/lineH)).forEach((line,j) => {
-                ctx.fillText(line, x+10, y+28+j*lineH);
-            });
-            x += colWidths[i];
-        });
-        y += h;
-    });
-
-    const link = document.createElement('a');
-    link.download = 'daily-sales-report-{{ report_date }}.jpg';
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
-    link.click();
-}
-</script>
+<script></script>
 </body>
 </html>
