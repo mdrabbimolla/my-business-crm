@@ -431,11 +431,7 @@ body {
             ✏️ Edit Follow-up
         </a>
 
-        <a href="/delete-followup/{{ followup['id'] }}"
-           onclick="return confirm('এই Follow-up টি কি delete করতে চান?');"
-           class="delete-button">
-            🗑️ Delete Follow-up
-        </a>
+        <form method="POST" action="/delete-followup/{{ followup['id'] }}" onsubmit="return confirm('এই Follow-up টি কি delete করতে চান?');" style="margin:0"><button type="submit" class="delete-button" style="width:100%;border:0;cursor:pointer;">🗑️ Delete Follow-up</button></form>
 
         {% if followup['phone'] %}
 
@@ -524,11 +520,7 @@ body {
             ✏️ Edit Follow-up
         </a>
 
-        <a href="/delete-followup/{{ followup['id'] }}"
-           onclick="return confirm('এই Follow-up টি কি delete করতে চান?');"
-           class="delete-button">
-            🗑️ Delete Follow-up
-        </a>
+        <form method="POST" action="/delete-followup/{{ followup['id'] }}" onsubmit="return confirm('এই Follow-up টি কি delete করতে চান?');" style="margin:0"><button type="submit" class="delete-button" style="width:100%;border:0;cursor:pointer;">🗑️ Delete Follow-up</button></form>
 
         {% if followup['phone'] %}
 
