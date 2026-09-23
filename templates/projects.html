@@ -133,7 +133,7 @@
 
             <div class="info">
                 Status:
-                <span class="status">
+                <span class="status" style="{% if project['status'] == 'Inactive' %}background:#fee2e2;color:#b91c1c;{% endif %}">
                     {{ project["status"] }}
                 </span>
             </div>
@@ -146,6 +146,8 @@
 
 <div style="display:flex; gap:8px; margin-top:14px;">
 
+    <a href="/project-files/{{ project['id'] }}" style="flex:1;padding:10px;background:#7c3aed;color:white;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">📁 Files</a>
+    <a href="/toggle-project/{{ project['id'] }}" style="flex:1;padding:10px;background:{% if project['status'] == 'Active' %}#64748b{% else %}#15803d{% endif %};color:white;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">{% if project['status'] == 'Active' %}⏸️ Inactive{% else %}▶️ Activate{% endif %}</a>
     <a href="/edit-project/{{ project['id'] }}"
        style="flex:1;
               padding:10px;
