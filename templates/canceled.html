@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cancelled Leads - My Business CRM</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172554}
+.header{background:linear-gradient(135deg,#172554,#173b70);color:white;padding:20px;border-bottom:3px solid #d4af37}
+.container{max-width:800px;margin:auto;padding:18px}
+.card{background:white;border-radius:14px;padding:17px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.07)}
+.info{margin:6px 0;font-size:14px;color:#475569}
+.back{display:inline-block;margin-bottom:15px;text-decoration:none;color:#173b70;font-weight:bold}
+.delete{display:block;margin-top:12px;padding:10px;background:#fee2e2;color:#b91c1c;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold}
+</style>
+</head>
+<body>
+{% include "menu.html" %}
+<div class="header"><h2 style="margin:0">❌ Cancelled Leads</h2></div>
+<div class="container">
+<a href="/dashboard" class="back">← Dashboard</a>
+
+{% if canceled_leads %}
+    {% for lead in canceled_leads %}
+    <div class="card">
+        <h3 style="margin:0 0 10px">👤 {{ lead['name'] or 'Name not added' }}</h3>
+        <div class="info">📞 <strong>Phone:</strong> {{ lead['phone'] or 'Not provided' }}</div>
+        <div class="info">🏗️ <strong>Project:</strong> {{ lead['project_name'] or 'Unassigned' }}</div>
+        <div class="info">👤 <strong>Assigned To:</strong> {{ lead['assigned_to'] or 'Unassigned' }}</div>
+        <div class="info">📅 <strong>Old Follow-up:</strong> {{ lead['follow_up_date'] or 'Not set' }}</div>
+        <div class="info">📝 <strong>Note:</strong> {{ lead['note'] or 'No note' }}</div>
+        <div class="info">❌ <strong>Cancelled Date:</strong> {{ lead['cancelled_date'] }}</div>
+        <a class="delete" href="/delete-canceled/{{ lead['id'] }}" onclick="return confirm('এই Cancelled record টি delete করতে চান?');">🗑️ Delete</a>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card" style="text-align:center">📭 কোনো Cancelled Lead নেই।</div>
+{% endif %}
+</div>
+</body>
+</html>
