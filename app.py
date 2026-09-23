@@ -97,13 +97,18 @@ def request_android_call_permission():
 def clean_phone(phone):
     phone = (phone or "").strip()
     phone = "".join(ch for ch in phone if ch.isdigit() or ch == "+")
+
+    # Android tel: URI needs the international +880 format.
     if phone.startswith("+"):
         phone = phone[1:]
+
     if phone.startswith("880"):
-        return phone
+        return "+" + phone
+
     if phone.startswith("0"):
-        return "88" + phone
-    return phone
+        return "+88" + phone
+
+    return "+" + phone if phone else ""
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -211,7 +216,9 @@ def android_whatsapp():
     if not phone:
         return "Phone number is missing"
 
-    whatsapp_url = "whatsapp://send?phone=" + phone
+    # WhatsApp expects the country code without the leading +.
+    whatsapp_phone = phone.lstrip("+")
+    whatsapp_url = "whatsapp://send?phone=" + whatsapp_phone
 
     # Only WhatsApp Business is allowed for this CRM.
     opened = open_android_url(
