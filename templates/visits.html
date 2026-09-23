@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visits - My Business CRM</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172554}
+.header{background:linear-gradient(135deg,#172554,#173b70);color:white;padding:20px;border-bottom:3px solid #d4af37}
+.container{max-width:800px;margin:auto;padding:18px}
+.card{background:white;border-radius:14px;padding:17px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.07)}
+.date-card{display:flex;justify-content:space-between;align-items:center;text-decoration:none;color:#172554}
+.date-card strong{font-size:17px}.count{background:#ede9fe;color:#5b21b6;padding:7px 11px;border-radius:20px;font-weight:bold}
+.info{margin:6px 0;font-size:14px;color:#475569}
+.back{display:inline-block;margin-bottom:15px;text-decoration:none;color:#173b70;font-weight:bold}
+</style>
+</head>
+<body>
+{% include "menu.html" %}
+<div class="header"><h2 style="margin:0">📍 Visit Schedule</h2></div>
+<div class="container">
+
+<a href="/dashboard" class="back">← Dashboard</a>
+
+{% if selected_date %}
+    <div class="card">
+        <h3 style="margin-top:0">📅 {{ selected_date }}</h3>
+        <p style="color:#64748b">{{ visits|length }}টি visit</p>
+    </div>
+
+    {% if visits %}
+        {% for lead in visits %}
+        <div class="card">
+            <h3 style="margin:0 0 10px">👤 {{ lead['name'] or 'Name not added' }}</h3>
+            <div class="info">📞 <strong>Phone:</strong> {{ lead['phone'] }}</div>
+            <div class="info">🏗️ <strong>Project:</strong> {{ lead['project_name'] or 'Unassigned' }}</div>
+            <div class="info">👤 <strong>Assigned To:</strong> {{ lead['assigned_user_name'] or 'Unassigned' }}</div>
+            <div class="info">📅 <strong>Visit Date:</strong> {{ lead['visit_date'] or 'Not set' }}</div>
+            <div class="info">⏰ <strong>Visit Time:</strong> {{ lead['visit_time'] or 'Not set' }}</div>
+            <div class="info">📅 <strong>Follow-up:</strong> {{ lead['follow_up_date'] or 'Not set' }}</div>
+            <div class="info">📌 <strong>Status:</strong> {{ lead['status'] or 'New' }}</div>
+            <div class="info">📝 <strong>Latest Note:</strong> {{ lead['latest_note'] or lead['notes'] or 'No note' }}</div>
+            {% if lead['latest_note_date'] %}
+            <div class="info">🗓️ <strong>Note Date:</strong> {{ lead['latest_note_date'] }}</div>
+            {% endif %}
+
+            <div style="display:flex;gap:8px;margin-top:12px">
+                <a href="/android-call?phone={{ lead['phone']|urlencode }}" style="flex:1;padding:10px;background:#dbeafe;color:#1d4ed8;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold">📞 Call</a>
+                <a href="/android-whatsapp?phone={{ lead['phone']|urlencode }}" style="flex:1;padding:10px;background:#dcfce7;color:#15803d;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold">💬 WhatsApp</a>
+            </div>
+            <a href="/edit-lead/{{ lead['id'] }}" style="display:block;margin-top:8px;padding:10px;background:#173b70;color:white;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold">✏️ Full Edit</a>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="card" style="text-align:center">📭 এই তারিখে কোনো visit নেই।</div>
+    {% endif %}
+
+    <a href="/visits" class="back">← সব Visit Date</a>
+{% else %}
+    <div class="card">
+        <h3 style="margin-top:0">📅 Visit-এর তারিখ অনুযায়ী তালিকা</h3>
+        <p style="color:#64748b;margin-bottom:0">যে তারিখে ক্লিক করবেন, সেই দিনের সব client-এর পূর্ণ তথ্য দেখা যাবে।</p>
+    </div>
+
+    {% if visit_dates %}
+        {% for item in visit_dates %}
+        <a class="card date-card" href="/visits?date={{ item['visit_date']|urlencode }}">
+            <span>📅 {{ item['visit_date'] }}</span>
+            <span class="count">{{ item['visit_count'] }} Visit</span>
+        </a>
+        {% endfor %}
+    {% else %}
+        <div class="card" style="text-align:center">📭 এখনো কোনো Visit সেট করা নেই।</div>
+    {% endif %}
+{% endif %}
+
+</div>
+</body>
+</html>
