@@ -152,12 +152,9 @@
         ✏️ Edit
     </a>
 
-    <a href="/delete-expense/{{ expense['id'] }}"
-       class="btn"
-       style="background:#c62828;"
-       onclick="return confirm('এই Expense টি Delete করতে চান?');">
-        🗑️ Delete
-    </a>
+    <form method="POST" action="/delete-expense/{{ expense['id'] }}" style="display:inline;margin:0" onsubmit="return confirm('এই Expense টি Delete করতে চান?');">
+       <button type="submit" class="btn" style="background:#c62828;border:0;cursor:pointer;">🗑️ Delete</button>
+    </form>
 
 </div>
 
