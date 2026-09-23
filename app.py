@@ -1898,6 +1898,7 @@ def leads():
         return redirect("/")
 
     search = request.args.get("search", "").strip()
+    project_filter = request.args.get("project_id", "").strip()
 
     conn = get_db()
 
@@ -1938,6 +1939,11 @@ def leads():
 
         params.append(current_user["username"])
 
+    # Project-wise filter
+    if project_filter:
+        query += " AND leads.project_id = ?"
+        params.append(project_filter)
+
     # Search
     if search:
 
@@ -1964,12 +1970,21 @@ def leads():
         params
     ).fetchall()
 
+    projects = conn.execute("""
+        SELECT id, name
+        FROM projects
+        WHERE status = 'Active'
+        ORDER BY name
+    """).fetchall()
+
     conn.close()
 
     return render_template(
         "leads.html",
         leads=leads,
-        search=search
+        search=search,
+        projects=projects,
+        project_filter=project_filter
     )
 @app.route("/add-lead", methods=["GET", "POST"])
 def add_lead():
@@ -2303,15 +2318,26 @@ def set_visit(lead_id):
 
         visit_date = request.form.get("visit_date") or None
         visit_time = request.form.get("visit_time") or None
+        visit_status = request.form.get("visit_status", "Planned")
+        completed_date = lead["visit_completed_date"]
+
+        if visit_status == "Completed":
+            completed_date = date.today().isoformat()
+        elif visit_status != "Completed":
+            completed_date = None
 
         conn.execute("""
             UPDATE leads
             SET visit_date = ?,
-                visit_time = ?
+                visit_time = ?,
+                visit_status = ?,
+                visit_completed_date = ?
             WHERE id = ?
         """, (
             visit_date,
             visit_time,
+            visit_status,
+            completed_date,
             lead_id
         ))
 
@@ -2466,6 +2492,143 @@ def delete_canceled(canceled_id):
 
     return redirect("/canceled")
 
+
+@app.route("/daily-report")
+def daily_report():
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    report_date = request.args.get("date") or date.today().isoformat()
+    project_filter = request.args.get("project_id", "").strip()
+
+    conn = get_db()
+
+    current_user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE username = ? AND active = 1
+    """, (session.get("username"),)).fetchone()
+
+    if not current_user:
+        conn.close()
+        return "User not found"
+
+    projects = conn.execute("""
+        SELECT id, name
+        FROM projects
+        WHERE status = 'Active'
+        ORDER BY name
+    """).fetchall()
+
+    params = [report_date, report_date]
+    query = """
+        SELECT
+            leads.id,
+            leads.name,
+            leads.phone,
+            leads.project_id,
+            leads.created_at,
+            leads.follow_up_date,
+            leads.visit_date,
+            leads.visit_time,
+            leads.visit_status,
+            leads.visit_completed_date,
+            projects.name AS project_name,
+            ln.note,
+            ln.note_date
+        FROM lead_notes ln
+        JOIN leads ON leads.id = ln.lead_id
+        LEFT JOIN projects ON projects.id = leads.project_id
+        WHERE ln.note_date = ?
+          AND ln.id = (
+              SELECT MAX(ln2.id)
+              FROM lead_notes ln2
+              WHERE ln2.lead_id = ln.lead_id
+                AND ln2.note_date = ?
+          )
+    """
+
+    if project_filter:
+        query += " AND leads.project_id = ?"
+        params.append(project_filter)
+
+    if current_user["role"] == "Sales":
+        query += " AND leads.assigned_to = ?"
+        params.append(current_user["username"])
+
+    query += " ORDER BY projects.name ASC, leads.id DESC"
+
+    talked_leads = conn.execute(query, params).fetchall()
+
+    visit_params = [report_date]
+    visit_query = """
+        SELECT COUNT(*)
+        FROM leads
+        WHERE visit_date = ?
+          AND visit_date IS NOT NULL
+    """
+    if project_filter:
+        visit_query += " AND project_id = ?"
+        visit_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        visit_query += " AND assigned_to = ?"
+        visit_params.append(current_user["username"])
+    visits_scheduled = conn.execute(visit_query, visit_params).fetchone()[0]
+
+    completed_params = [report_date]
+    completed_query = """
+        SELECT COUNT(*)
+        FROM leads
+        WHERE visit_status = 'Completed'
+          AND visit_completed_date = ?
+    """
+    if project_filter:
+        completed_query += " AND project_id = ?"
+        completed_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        completed_query += " AND assigned_to = ?"
+        completed_params.append(current_user["username"])
+    visits_completed = conn.execute(completed_query, completed_params).fetchone()[0]
+
+    cancelled_params = [report_date]
+    cancelled_query = """
+        SELECT COUNT(*)
+        FROM canceled_leads
+        WHERE cancelled_date = ?
+    """
+    if project_filter:
+        cancelled_query += " AND project_id = ?"
+        cancelled_params.append(project_filter)
+    if current_user["role"] == "Sales":
+        cancelled_query += " AND assigned_to = ?"
+        cancelled_params.append(current_user["username"])
+    cancelled_count = conn.execute(cancelled_query, cancelled_params).fetchone()[0]
+
+    new_leads_count = sum(
+        1 for lead in talked_leads
+        if (lead["created_at"] or "")[:10] == report_date
+    )
+    followup_leads_count = sum(
+        1 for lead in talked_leads
+        if lead["follow_up_date"] == report_date
+    )
+
+    conn.close()
+
+    return render_template(
+        "daily_report.html",
+        report_date=report_date,
+        project_filter=project_filter,
+        projects=projects,
+        talked_leads=talked_leads,
+        talked_count=len(talked_leads),
+        new_leads_count=new_leads_count,
+        followup_leads_count=followup_leads_count,
+        visits_scheduled=visits_scheduled,
+        visits_completed=visits_completed,
+        cancelled_count=cancelled_count
+    )
 
 @app.route("/monthly-report")
 def monthly_report():
