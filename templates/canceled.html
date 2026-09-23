@@ -30,7 +30,7 @@ body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172554}
         <div class="info">📅 <strong>Old Follow-up:</strong> {{ lead['follow_up_date'] or 'Not set' }}</div>
         <div class="info">📝 <strong>Note:</strong> {{ lead['note'] or 'No note' }}</div>
         <div class="info">❌ <strong>Cancelled Date:</strong> {{ lead['cancelled_date'] }}</div>
-        <a class="delete" href="/delete-canceled/{{ lead['id'] }}" onclick="return confirm('এই Cancelled record টি delete করতে চান?');">🗑️ Delete</a>
+        <form method="POST" action="/delete-canceled/{{ lead['id'] }}" onsubmit="return confirm('এই Cancelled record টি delete করতে চান?');" style="margin:0"><button class="delete" type="submit" style="border:0;width:100%;cursor:pointer;">🗑️ Delete</button></form>
     </div>
     {% endfor %}
 {% else %}
