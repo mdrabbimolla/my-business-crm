@@ -99,6 +99,21 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            item_type TEXT NOT NULL DEFAULT 'file',
+            text_content TEXT,
+            file_name TEXT,
+            file_path TEXT,
+            mime_type TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (project_id) REFERENCES projects(id)
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
@@ -182,6 +197,7 @@ def init_db():
             VALUES (1, ?)
         """, ("ARKAM MC PARK",))
 
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_project_files_project ON project_files(project_id, id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_lead_id ON lead_notes(lead_id, id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_lead_notes_date ON lead_notes(note_date, id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_project ON leads(project_id)")
