@@ -1,5 +1,9 @@
 name: Build My Business CRM APK
 
+concurrency:
+  group: apk-build
+  cancel-in-progress: true
+
 on:
   push:
     branches:
