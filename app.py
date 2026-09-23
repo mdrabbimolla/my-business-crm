@@ -1,5 +1,7 @@
 from datetime import date
 from urllib.parse import quote
+import json
+import urllib.request
 from flask import Flask, request, redirect, session, render_template
 from database import get_db, init_db
 
@@ -27,6 +29,11 @@ app.secret_key = "mycrm-secret-key"
 
 
 init_db()
+
+try:
+    from app_version import APP_VERSION
+except ImportError:
+    APP_VERSION = "1.0.0"
 
 
 def _start_android_url(url, action="VIEW", package_name=None):
@@ -109,6 +116,25 @@ def clean_phone(phone):
         return "+88" + phone
 
     return "+" + phone if phone else ""
+
+
+def get_update_info():
+    """Check the latest public GitHub Release for a newer APK."""
+    try:
+        api_url = "https://api.github.com/repos/mdrabbimolla/my-business-crm/releases/latest"
+        req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json", "User-Agent": "My-Business-CRM"})
+        with urllib.request.urlopen(req, timeout=2.5) as response:
+            release = json.loads(response.read().decode("utf-8"))
+        tag = (release.get("tag_name") or "").lstrip("v")
+        latest_version = tuple(int(p) for p in tag.split(".") if p.isdigit())
+        current_version = tuple(int(p) for p in APP_VERSION.split(".") if p.isdigit())
+        if not latest_version or latest_version <= current_version:
+            return None
+        apk_url = next((a.get("browser_download_url") for a in release.get("assets", []) if (a.get("name") or "").lower().endswith(".apk")), None)
+        return {"current_version": APP_VERSION, "latest_version": tag, "release_url": release.get("html_url"), "apk_url": apk_url}
+    except Exception as exc:
+        print("UPDATE CHECK ERROR:", exc)
+    return None
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -394,6 +420,19 @@ def users():
         users=users
     )
 
+@app.route("/update")
+def update_app():
+    if not session.get("logged_in"):
+        return redirect("/")
+    update_info = get_update_info()
+    if not update_info:
+        return "<h2>✅ You are using the latest version.</h2><a href='/dashboard'>← Back to Dashboard</a>"
+    update_url = update_info.get("apk_url") or update_info.get("release_url")
+    if update_url and open_android_url(update_url, action="VIEW"):
+        return f"<h2>⬇️ Update download is opening...</h2><p>Current: {update_info['current_version']}</p><p>New: {update_info['latest_version']}</p><p>Download the APK and tap Install. Uninstall is not required.</p><a href='/dashboard'>← Back to Dashboard</a>"
+    return f"<h2>🆕 Update Available</h2><p>Current: {update_info['current_version']}</p><p>New: {update_info['latest_version']}</p><a href='{update_url or '#'}' target='_blank'>Download Update</a><br><br><a href='/dashboard'>← Back to Dashboard</a>"
+
+
 @app.route("/dashboard")
 def dashboard():
 
@@ -444,6 +483,8 @@ def dashboard():
 
     conn.close()
 
+    update_info = get_update_info()
+
     return render_template(
         "dashboard.html",
         total_customers=total_customers,
@@ -453,7 +494,9 @@ def dashboard():
         upcoming_followup_count=upcoming_followup_count,
         visit_count=visit_count,
         cancel_count=cancel_count,
-        today_followups=today_followups
+        today_followups=today_followups,
+        app_version=APP_VERSION,
+        update_info=update_info
     )
 
 
