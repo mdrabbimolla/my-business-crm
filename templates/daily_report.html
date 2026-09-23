@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Sales Report - My Business CRM</title>
+<style>
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172554}
+.header{background:linear-gradient(135deg,#172554,#173b70);color:white;padding:20px;border-bottom:3px solid #d4af37}
+.container{max-width:900px;margin:auto;padding:16px}
+.card{background:white;border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 3px 10px rgba(0,0,0,.07)}
+.filters{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;box-sizing:border-box}
+.btn{display:block;text-align:center;text-decoration:none;padding:12px;border-radius:9px;font-weight:bold;border:0;cursor:pointer}
+.primary{background:#173b70;color:white}.gold{background:#d4af37;color:#172554}.back{color:#173b70}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
+.stat b{display:block;font-size:23px;margin-top:5px}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;font-size:13px}
+th{background:#f8fafc}
+.note{max-width:360px;white-space:pre-wrap}
+.small{font-size:12px;color:#64748b}
+@media(max-width:600px){.filters,.stats{grid-template-columns:1fr}.container{padding:12px}}
+</style>
+</head>
+<body>
+{% include "menu.html" %}
+<div class="header"><h2 style="margin:0">📊 Daily Sales Report</h2></div>
+<div class="container">
+
+<div class="card">
+<form method="GET" action="/daily-report" class="filters">
+<div>
+<label>📅 Report Date</label>
+<input type="date" name="date" value="{{ report_date }}">
+</div>
+<div>
+<label>🏗️ Project</label>
+<select name="project_id">
+<option value="">All Projects</option>
+{% for project in projects %}
+<option value="{{ project['id'] }}" {% if project_filter == project['id']|string %}selected{% endif %}>{{ project['name'] }}</option>
+{% endfor %}
+</select>
+</div>
+<div>
+<button class="btn primary" type="submit">🔎 Generate Report</button>
+</div>
+<div>
+<a class="btn gold" href="/leads">← Back to Leads</a>
+</div>
+</form>
+</div>
+
+<div class="card">
+<div class="stats">
+<div class="stat">🗣️ কথা হয়েছে<b>{{ talked_count }}</b></div>
+<div class="stat">🆕 নতুন Lead<b>{{ new_leads_count }}</b></div>
+<div class="stat">🔄 Follow-up Lead<b>{{ followup_leads_count }}</b></div>
+<div class="stat">📍 Visit Set<b>{{ visits_scheduled }}</b></div>
+<div class="stat">✅ Visit Completed<b>{{ visits_completed }}</b></div>
+<div class="stat">❌ Cancelled<b>{{ cancelled_count }}</b></div>
+</div>
+</div>
+
+<div class="card">
+<button class="btn gold" onclick="downloadJpeg()">🖼️ Download This Report as JPEG</button>
+<p class="small" style="margin-bottom:0">JPEG-এ শুধু এই তারিখের update notes, নাম, masked phone ও project থাকবে। পুরো phone number কখনো থাকবে না।</p>
+</div>
+
+<div class="card" id="reportCard">
+<h3 style="margin-top:0">📋 {{ report_date }} — কথা বলা Lead</h3>
+{% if talked_leads %}
+<div class="table-wrap">
+<table id="reportTable">
+<thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Type</th><th>Updated Note</th></tr></thead>
+<tbody>
+{% for lead in talked_leads %}
+<tr>
+<td>{{ loop.index }}</td>
+<td>{{ lead['name'] or 'Name not added' }}</td>
+<td>{{ lead['phone'][:5] if lead['phone'] else '' }}×××{{ lead['phone'][-3:] if lead['phone'] else '' }}</td>
+<td>{{ lead['project_name'] or 'Unassigned' }}</td>
+<td>
+{% if (lead['created_at'] or '')[:10] == report_date %}New Lead
+{% elif lead['follow_up_date'] == report_date %}Follow-up
+{% else %}Conversation{% endif %}
+</td>
+<td class="note">{{ lead['note'] }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<div style="text-align:center;color:#64748b;padding:25px">📭 এই তারিখ/Project-এর জন্য কোনো update note পাওয়া যায়নি।</div>
+{% endif %}
+</div>
+
+</div>
+
+<script>
+function wrapText(ctx, text, maxWidth) {
+    const words = String(text || '').split(/\s+/);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+        const test = line ? line + ' ' + word : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = test;
+        }
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [''];
+}
+
+function downloadJpeg() {
+    const table = document.getElementById('reportTable');
+    if (!table) {
+        alert('এই রিপোর্টে কোনো update note নেই।');
+        return;
+    }
+
+    const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr =>
+        Array.from(tr.children).map(td => td.innerText.trim())
+    );
+
+    const width = 1400;
+    const margin = 45;
+    const lineH = 34;
+    const rowPad = 18;
+    const colWidths = [55, 230, 190, 220, 150, 420];
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = '24px Arial';
+
+    let totalHeight = 190;
+    const rowHeights = [];
+
+    rows.forEach(row => {
+        let maxLines = 1;
+        row.forEach((cell, i) => {
+            const lines = wrapText(ctx, cell, colWidths[i] - 20);
+            maxLines = Math.max(maxLines, lines.length);
+        });
+        const h = Math.max(58, maxLines * lineH + rowPad);
+        rowHeights.push(h);
+        totalHeight += h;
+    });
+
+    canvas.width = width;
+    canvas.height = Math.min(Math.max(totalHeight, 500), 20000);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = '#172554';
+    ctx.font = 'bold 34px Arial';
+    ctx.fillText('My Business CRM - Daily Sales Report', margin, 55);
+
+    ctx.font = '24px Arial';
+    ctx.fillStyle = '#475569';
+    ctx.fillText('Date: {{ report_date }}{% if project_filter %} | Project filtered{% endif %}', margin, 95);
+
+    ctx.font = 'bold 22px Arial';
+    ctx.fillStyle = '#173b70';
+    ctx.fillText('Talked: {{ talked_count }}   New: {{ new_leads_count }}   Follow-up: {{ followup_leads_count }}   Visit Set: {{ visits_scheduled }}   Completed: {{ visits_completed }}', margin, 135);
+
+    let y = 170;
+    const headers = ['#','Name','Phone','Project','Type','Updated Note'];
+    let x = margin;
+    ctx.fillStyle = '#173b70';
+    ctx.fillRect(margin, y, width - margin*2, 48);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 20px Arial';
+    headers.forEach((h,i) => { ctx.fillText(h, x+10, y+31); x += colWidths[i]; });
+
+    y += 48;
+    ctx.font = '20px Arial';
+
+    rows.forEach((row, ri) => {
+        const h = rowHeights[ri];
+        x = margin;
+        ctx.fillStyle = ri % 2 === 0 ? '#f8fafc' : '#ffffff';
+        ctx.fillRect(margin, y, width - margin*2, h);
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.strokeRect(margin, y, width - margin*2, h);
+
+        row.forEach((cell,i) => {
+            ctx.fillStyle = '#172554';
+            const lines = wrapText(ctx, cell, colWidths[i]-20);
+            lines.slice(0, Math.floor((h-12)/lineH)).forEach((line,j) => {
+                ctx.fillText(line, x+10, y+28+j*lineH);
+            });
+            x += colWidths[i];
+        });
+        y += h;
+    });
+
+    const link = document.createElement('a');
+    link.download = 'daily-sales-report-{{ report_date }}.jpg';
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.click();
+}
+</script>
+</body>
+</html>
