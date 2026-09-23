@@ -99,6 +99,24 @@ th{background:#f8fafc}
 {% endif %}
 </div>
 
+<div class="card">
+<h3 style="margin-top:0">📍 Visit Set List ({{ visits_scheduled }})</h3>
+{% if visit_list %}
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Time</th><th>Status</th></tr></thead><tbody>
+{% for visit in visit_list %}<tr><td>{{ loop.index }}</td><td>{{ visit['name'] or 'Name not added' }}</td><td>{{ visit['phone'] }}</td><td>{{ visit['project_name'] or 'Unassigned' }}</td><td>{{ visit['visit_time'] or '-' }}</td><td>{{ visit['visit_status'] or 'Planned' }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p class="small">আজ কোনো Visit Set নেই।</p>{% endif %}
+</div>
+
+<div class="card">
+<h3 style="margin-top:0">✅ Visit Completed List ({{ visits_completed }})</h3>
+{% if completed_list %}
+<div class="table-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Project</th><th>Time</th></tr></thead><tbody>
+{% for visit in completed_list %}<tr><td>{{ loop.index }}</td><td>{{ visit['name'] or 'Name not added' }}</td><td>{{ visit['phone'] }}</td><td>{{ visit['project_name'] or 'Unassigned' }}</td><td>{{ visit['visit_time'] or '-' }}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p class="small">আজ কোনো Visit Completed নেই।</p>{% endif %}
+</div>
+
 </div>
 
 <script></script>
