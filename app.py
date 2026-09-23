@@ -403,72 +403,36 @@ def dashboard():
         "SELECT COALESCE(SUM(sales), 0) FROM customers"
     ).fetchone()[0]
 
-    total_paid = conn.execute(
-        "SELECT COALESCE(SUM(paid), 0) FROM customers"
-    ).fetchone()[0]
-
-    total_payments = conn.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM payments"
-    ).fetchone()[0]
-
-    total_due = total_sales - total_paid
-
-    total_expenses = conn.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM expenses"
-    ).fetchone()[0]
-
-    net_profit = total_sales - total_expenses
-
-    category_expenses = conn.execute("""
-        SELECT
-            category,
-            COALESCE(SUM(amount), 0) AS total
-        FROM expenses
-        GROUP BY category
-        ORDER BY total DESC
-    """).fetchall()
-
     today = date.today().isoformat()
 
     today_followups = conn.execute(
-        "SELECT * FROM followups WHERE follow_up_date = ?",
+        "SELECT * FROM followups WHERE follow_up_date = ? ORDER BY id DESC",
         (today,)
     ).fetchall()
 
     today_followup_count = len(today_followups)
 
-    missed_followup_count = conn.execute(
-    """
-    SELECT COUNT(*)
-    FROM followups
-    WHERE follow_up_date < ?
-    """,
-    (today,)
-    ).fetchone()[0]
+    missed_followup_count = conn.execute("""
+        SELECT COUNT(*)
+        FROM followups
+        WHERE follow_up_date < ?
+    """, (today,)).fetchone()[0]
 
-    upcoming_followup_count = conn.execute(
-    """
-    SELECT COUNT(*)
-    FROM followups
-    WHERE follow_up_date > ?
-    """,
-    (today,)
-    ).fetchone()[0]
+    upcoming_followup_count = conn.execute("""
+        SELECT COUNT(*)
+        FROM followups
+        WHERE follow_up_date > ?
+    """, (today,)).fetchone()[0]
 
-    number_off_count = conn.execute(
-        "SELECT COUNT(*) FROM followups WHERE status = 'Number Off'"
-    ).fetchone()[0]
-
-    not_received_count = conn.execute(
-        "SELECT COUNT(*) FROM followups WHERE status = 'Not Received'"
-    ).fetchone()[0]
-
-    positive_count = conn.execute(
-        "SELECT COUNT(*) FROM followups WHERE status = 'Positive'"
-    ).fetchone()[0]
+    visit_count = conn.execute("""
+        SELECT COUNT(*)
+        FROM leads
+        WHERE visit_date IS NOT NULL
+        AND TRIM(visit_date) != ''
+    """).fetchone()[0]
 
     cancel_count = conn.execute(
-        "SELECT COUNT(*) FROM followups WHERE status = 'Cancel'"
+        "SELECT COUNT(*) FROM canceled_leads"
     ).fetchone()[0]
 
     conn.close()
@@ -477,21 +441,15 @@ def dashboard():
         "dashboard.html",
         total_customers=total_customers,
         total_sales=total_sales,
-        total_paid=total_paid,
-        total_payments=total_payments,
-        category_expenses=category_expenses,
-        total_due=total_due,
-        total_expenses=total_expenses,
-        net_profit=net_profit,
         today_followup_count=today_followup_count,
         missed_followup_count=missed_followup_count,
         upcoming_followup_count=upcoming_followup_count,
-        number_off_count=number_off_count,
-        not_received_count=not_received_count,
-        positive_count=positive_count,
+        visit_count=visit_count,
         cancel_count=cancel_count,
         today_followups=today_followups
     )
+
+
 @app.route("/backup")
 def backup():
 
@@ -1604,11 +1562,64 @@ def edit_followup(followup_id):
 
     if request.method == "POST":
 
-        name = request.form.get("name")
-        phone = request.form.get("phone")
-        follow_up_date = request.form.get("follow_up_date")
-        note = request.form.get("note")
-        status = request.form.get("status")
+        name = request.form.get("name", "").strip()
+        phone = request.form.get("phone", "").strip()
+        follow_up_date = request.form.get("follow_up_date") or None
+        note = request.form.get("note", "").strip()
+        status = request.form.get("status", "New")
+
+        # Cancel means: remove it from active Follow-ups and store it separately.
+        if status == "Cancel":
+            project_id = None
+            project_name = None
+            assigned_to = None
+
+            if followup["lead_id"]:
+                lead = conn.execute("""
+                    SELECT leads.*, projects.name AS project_name
+                    FROM leads
+                    LEFT JOIN projects ON leads.project_id = projects.id
+                    WHERE leads.id = ?
+                """, (followup["lead_id"],)).fetchone()
+
+                if lead:
+                    project_id = lead["project_id"]
+                    project_name = lead["project_name"]
+                    assigned_to = lead["assigned_to"]
+
+            conn.execute("""
+                INSERT INTO canceled_leads
+                (lead_id, name, phone, project_id, project_name, assigned_to,
+                 follow_up_date, note, cancelled_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                followup["lead_id"],
+                name or followup["name"],
+                phone or followup["phone"],
+                project_id,
+                project_name,
+                assigned_to,
+                follow_up_date or followup["follow_up_date"],
+                note or followup["note"],
+                date.today().isoformat()
+            ))
+
+            if followup["lead_id"]:
+                conn.execute("""
+                    UPDATE leads
+                    SET follow_up_date = NULL
+                    WHERE id = ?
+                """, (followup["lead_id"],))
+
+            conn.execute(
+                "DELETE FROM followups WHERE id = ?",
+                (followup_id,)
+            )
+
+            conn.commit()
+            conn.close()
+
+            return redirect("/canceled")
 
         conn.execute("""
             UPDATE followups
@@ -1627,6 +1638,22 @@ def edit_followup(followup_id):
             followup_id
         ))
 
+        if followup["lead_id"]:
+            conn.execute("""
+                UPDATE leads
+                SET name = ?,
+                    phone = ?,
+                    follow_up_date = ?,
+                    notes = ?
+                WHERE id = ?
+            """, (
+                name,
+                phone,
+                follow_up_date,
+                note,
+                followup["lead_id"]
+            ))
+
         conn.commit()
         conn.close()
 
@@ -1638,6 +1665,8 @@ def edit_followup(followup_id):
         "edit_followup.html",
         followup=followup
     )
+
+
 @app.route("/delete-followup/<int:followup_id>")
 def delete_followup(followup_id):
 
@@ -1645,6 +1674,24 @@ def delete_followup(followup_id):
         return redirect("/")
 
     conn = get_db()
+
+    followup = conn.execute(
+        "SELECT lead_id FROM followups WHERE id = ?",
+        (followup_id,)
+    ).fetchone()
+
+    if not followup:
+        conn.close()
+        return redirect("/followups")
+
+    # Clear the lead's follow-up date too. Otherwise database migration
+    # would recreate the deleted follow-up on the next app start.
+    if followup["lead_id"]:
+        conn.execute("""
+            UPDATE leads
+            SET follow_up_date = NULL
+            WHERE id = ?
+        """, (followup["lead_id"],))
 
     conn.execute(
         "DELETE FROM followups WHERE id = ?",
@@ -1655,6 +1702,8 @@ def delete_followup(followup_id):
     conn.close()
 
     return redirect("/followups")
+
+
 @app.route("/add-expense", methods=["GET", "POST"])
 def add_expense():
 
@@ -2227,6 +2276,147 @@ def set_visit(lead_id):
         "set_visit.html",
         lead=lead
     )
+@app.route("/visits")
+def visits():
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    selected_date = request.args.get("date")
+
+    conn = get_db()
+
+    current_user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE username = ? AND active = 1
+    """, (session.get("username"),)).fetchone()
+
+    if not current_user:
+        conn.close()
+        return "User not found"
+
+    date_query = """
+        SELECT
+            visit_date,
+            COUNT(*) AS visit_count
+        FROM leads
+        WHERE visit_date IS NOT NULL
+        AND TRIM(visit_date) != ''
+    """
+    date_params = []
+
+    if current_user["role"] == "Sales":
+        date_query += " AND assigned_to = ?"
+        date_params.append(current_user["username"])
+
+    date_query += """
+        GROUP BY visit_date
+        ORDER BY visit_date ASC
+    """
+
+    visit_dates = conn.execute(date_query, date_params).fetchall()
+
+    visits = []
+
+    if selected_date:
+        visit_query = """
+            SELECT
+                leads.*,
+                projects.name AS project_name,
+                users.name AS assigned_user_name,
+                (SELECT note FROM lead_notes
+                 WHERE lead_id = leads.id
+                 ORDER BY id DESC LIMIT 1) AS latest_note,
+                (SELECT note_date FROM lead_notes
+                 WHERE lead_id = leads.id
+                 ORDER BY id DESC LIMIT 1) AS latest_note_date
+            FROM leads
+            LEFT JOIN projects ON leads.project_id = projects.id
+            LEFT JOIN users ON leads.assigned_to = users.username
+            WHERE leads.visit_date = ?
+        """
+        visit_params = [selected_date]
+
+        if current_user["role"] == "Sales":
+            visit_query += " AND leads.assigned_to = ?"
+            visit_params.append(current_user["username"])
+
+        visit_query += " ORDER BY leads.visit_time ASC, leads.id DESC"
+
+        visits = conn.execute(
+            visit_query,
+            visit_params
+        ).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "visits.html",
+        visit_dates=visit_dates,
+        visits=visits,
+        selected_date=selected_date
+    )
+
+
+@app.route("/canceled")
+def canceled():
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    conn = get_db()
+
+    current_user = conn.execute("""
+        SELECT *
+        FROM users
+        WHERE username = ? AND active = 1
+    """, (session.get("username"),)).fetchone()
+
+    if not current_user:
+        conn.close()
+        return "User not found"
+
+    query = """
+        SELECT *
+        FROM canceled_leads
+        WHERE 1=1
+    """
+    params = []
+
+    if current_user["role"] == "Sales":
+        query += " AND assigned_to = ?"
+        params.append(current_user["username"])
+
+    query += " ORDER BY cancelled_date DESC, id DESC"
+
+    canceled_leads = conn.execute(query, params).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "canceled.html",
+        canceled_leads=canceled_leads
+    )
+
+
+@app.route("/delete-canceled/<int:canceled_id>")
+def delete_canceled(canceled_id):
+
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    conn = get_db()
+    conn.execute(
+        "DELETE FROM canceled_leads WHERE id = ?",
+        (canceled_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    return redirect("/canceled")
+
+
 @app.route("/monthly-report")
 def monthly_report():
 
