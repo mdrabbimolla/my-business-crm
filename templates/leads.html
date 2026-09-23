@@ -307,20 +307,37 @@
         </div>
 
         <div class="search-box">
-            <form method="GET" action="/leads">
+            <form method="GET" action="/leads" style="display:grid;gap:9px;">
 
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Search name or phone..."
-                    value="{{ search }}"
-                >
+                <select name="project_id"
+                        style="width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;">
+                    <option value="">🏗️ All Projects</option>
+                    {% for project in projects %}
+                    <option value="{{ project['id'] }}" {% if project_filter == project['id']|string %}selected{% endif %}>
+                        {{ project['name'] }}
+                    </option>
+                    {% endfor %}
+                </select>
 
-                <button type="submit">
-                    🔎 Search
-                </button>
+                <div style="display:flex;gap:8px;">
+                    <input
+                        type="text"
+                        name="search"
+                        placeholder="Search name or phone..."
+                        value="{{ search }}"
+                    >
+
+                    <button type="submit">
+                        🔎 Filter
+                    </button>
+                </div>
 
             </form>
+
+            <a href="/daily-report"
+               style="display:block;margin-top:10px;padding:11px;background:#d4af37;color:#172554;text-align:center;text-decoration:none;border-radius:8px;font-weight:bold;">
+                📊 Daily Sales Report
+            </a>
         </div>
 
         {% if leads %}
