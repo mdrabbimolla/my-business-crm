@@ -160,18 +160,9 @@
         ✏️ Edit
     </a>
 
-    <a href="/delete-project/{{ project['id'] }}"
-       onclick="return confirm('Delete this project?');"
-       style="flex:1;
-              padding:10px;
-              background:#dc3545;
-              color:white;
-              text-align:center;
-              text-decoration:none;
-              border-radius:8px;
-              font-weight:bold;">
-        🗑️ Delete
-    </a>
+    <form method="POST" action="/delete-project/{{ project['id'] }}" style="flex:1;margin:0;" onsubmit="return confirm('Delete this project?');">
+        <button type="submit" style="width:100%;padding:10px;background:#dc3545;color:white;border:0;border-radius:8px;font-weight:bold;">🗑️ Delete</button>
+    </form>
 
 </div>
 
