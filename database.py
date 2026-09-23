@@ -82,6 +82,23 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS canceled_leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            lead_id INTEGER,
+            name TEXT,
+            phone TEXT,
+            project_id INTEGER,
+            project_name TEXT,
+            assigned_to TEXT,
+            follow_up_date TEXT,
+            note TEXT,
+            cancelled_date TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (lead_id) REFERENCES leads(id)
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS payments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_id INTEGER NOT NULL,
@@ -175,6 +192,45 @@ def init_db():
         )
     """)
 
+    # Move any older Cancel follow-ups into the dedicated Cancelled Leads area.
+    conn.execute("""
+        INSERT INTO canceled_leads
+        (lead_id, name, phone, project_id, project_name, assigned_to,
+         follow_up_date, note, cancelled_date)
+        SELECT
+            f.lead_id,
+            f.name,
+            f.phone,
+            l.project_id,
+            p.name,
+            l.assigned_to,
+            f.follow_up_date,
+            f.note,
+            substr(COALESCE(f.created_at, CURRENT_TIMESTAMP), 1, 10)
+        FROM followups f
+        LEFT JOIN leads l ON f.lead_id = l.id
+        LEFT JOIN projects p ON l.project_id = p.id
+        WHERE f.status = 'Cancel'
+        AND NOT EXISTS (
+            SELECT 1 FROM canceled_leads c
+            WHERE c.lead_id = f.lead_id
+            AND f.lead_id IS NOT NULL
+        )
+    """)
+
+    conn.execute("""
+        UPDATE leads
+        SET follow_up_date = NULL
+        WHERE id IN (
+            SELECT lead_id
+            FROM followups
+            WHERE status = 'Cancel'
+            AND lead_id IS NOT NULL
+        )
+    """)
+
+    conn.execute("DELETE FROM followups WHERE status = 'Cancel'")
+
     conn.execute("""
         INSERT INTO followups
         (lead_id, name, phone, follow_up_date, note, status)
@@ -185,9 +241,14 @@ def init_db():
         AND NOT EXISTS (
             SELECT 1 FROM followups f WHERE f.lead_id = leads.id
         )
+        AND NOT EXISTS (
+            SELECT 1 FROM canceled_leads c WHERE c.lead_id = leads.id
+        )
     """)
 
     conn.execute("CREATE INDEX IF NOT EXISTS idx_followups_lead_id ON followups(lead_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_canceled_leads_date ON canceled_leads(cancelled_date, id DESC)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_canceled_leads_lead_id ON canceled_leads(lead_id)")
     conn.commit()
     conn.close()
 
