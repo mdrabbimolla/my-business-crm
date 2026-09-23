@@ -440,6 +440,8 @@
                             </span>
                         </a>
 
+                        <a href="/delete-lead/{{ lead['id'] }}" class="action-btn" style="background:#fee2e2;color:#b91c1c;border-color:#fecaca;" onclick="return confirm('এই lead টি delete করবেন?')"><span><span class="action-icon">🗑️</span>Delete Lead</span></a>
+
                         <a
                             href="/set-visit/{{ lead['id'] }}"
                             class="action-btn visit"
