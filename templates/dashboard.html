@@ -108,11 +108,12 @@
 
     <div class="grid">
 
-        <div class="card">
+        <a class="card" href="/customers">
             <div class="icon">👥</div>
             <h3>Total Customers</h3>
             <div class="value">{{ total_customers }}</div>
-        </div>
+            <div style="margin-top:7px;font-size:12px;color:#173b70;font-weight:bold;">Tap to view & add</div>
+        </a>
 
         <div class="card">
             <div class="icon">💰</div>
@@ -158,6 +159,14 @@
         </div>
 
     </div>
+
+    {% if update_info %}
+    <a href="/update" class="followup" style="display:block;text-decoration:none;color:#172554;border:2px solid #d4af37;">
+        <h3>🆕 New Update Available</h3>
+        <p>Current: {{ app_version }} → New: {{ update_info['latest_version'] }}</p>
+        <div style="margin-top:10px;padding:10px;background:#173b70;color:white;text-align:center;border-radius:8px;font-weight:bold;">⬇️ Update Now</div>
+    </a>
+    {% endif %}
 
     <div class="followups">
         <h2>📅 Today's Follow-up</h2>
