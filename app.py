@@ -2173,7 +2173,8 @@ def leads():
         leads=leads,
         search=search,
         projects=projects,
-        project_filter=project_filter
+        project_filter=project_filter,
+        current_role=current_user["role"]
     )
 @app.route("/add-lead", methods=["GET", "POST"])
 def add_lead():
@@ -2496,7 +2497,7 @@ def delete_lead(lead_id):
     if not current_user or not lead:
         conn.close()
         return redirect("/leads")
-    if current_user["role"] == "Sales" and lead["assigned_to"] != current_user["username"]:
+    if current_user["role"] != "Admin":
         conn.close()
         return "Access Denied"
     conn.execute("DELETE FROM followups WHERE lead_id = ?", (lead_id,))
@@ -2827,28 +2828,6 @@ def daily_report():
         if lead["follow_up_date"] == report_date
         and (lead["previous_note_count"] or 0) > 0
     )
-    visit_list_query = """
-        SELECT leads.name, leads.phone, leads.visit_time, leads.visit_status,
-               projects.name AS project_name
-        FROM leads
-        LEFT JOIN projects ON projects.id = leads.project_id
-        WHERE leads.visit_date = ?
-    """
-    visit_list_params = [report_date]
-    if project_filter:
-        visit_list_query += " AND leads.project_id = ?"
-        visit_list_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        visit_list_query += " AND leads.assigned_to = ?"
-        visit_list_params.append(current_user["username"])
-    visit_list_query += " ORDER BY leads.visit_time ASC, leads.id DESC"
-    visit_list = conn.execute(visit_list_query, visit_list_params).fetchall()
-    completed_list_query = visit_list_query.replace(
-        "WHERE leads.visit_date = ?",
-        "WHERE leads.visit_status = 'Completed' AND leads.visit_completed_date = ?"
-    )
-    completed_list = conn.execute(completed_list_query, visit_list_params).fetchall()
-
     conn.close()
 
     return render_template(
@@ -2862,86 +2841,9 @@ def daily_report():
         followup_leads_count=followup_leads_count,
         visits_scheduled=visits_scheduled,
         visits_completed=visits_completed,
-        cancelled_count=cancelled_count,
-        visit_list=visit_list,
-        completed_list=completed_list
+        cancelled_count=cancelled_count
     )
 
-
-@app.route("/daily-report-jpeg")
-def daily_report_jpeg():
-    if not session.get("logged_in"):
-        return redirect("/")
-    report_date = request.args.get("date") or date.today().isoformat()
-    project_filter = request.args.get("project_id", "").strip()
-    conn = get_db()
-    current_user = conn.execute("SELECT * FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
-    if not current_user:
-        conn.close()
-        return "User not found"
-    params = [report_date, report_date]
-    query = """SELECT leads.name, leads.phone, leads.created_at, leads.follow_up_date, projects.name AS project_name, ln.note,
-                      (SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id = ln.lead_id AND z.id < ln.id) AS previous_note_count
-               FROM lead_notes ln JOIN leads ON leads.id = ln.lead_id
-               LEFT JOIN projects ON projects.id = leads.project_id
-               WHERE ln.note_date = ?
-                 AND ln.id = (SELECT MAX(x.id) FROM lead_notes x WHERE x.lead_id = ln.lead_id AND x.note_date = ?)"""
-    if project_filter:
-        query += " AND leads.project_id = ?"
-        params.append(project_filter)
-    if current_user["role"] == "Sales":
-        query += " AND leads.assigned_to = ?"
-        params.append(current_user["username"])
-    query += " ORDER BY projects.name, leads.id DESC"
-    rows = conn.execute(query, params).fetchall()
-    visit_params = [report_date]
-    visit_query = "SELECT name, phone, visit_time, visit_status FROM leads WHERE visit_date = ?"
-    if project_filter:
-        visit_query += " AND project_id = ?"
-        visit_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        visit_query += " AND assigned_to = ?"
-        visit_params.append(current_user["username"])
-    visit_rows = conn.execute(visit_query + " ORDER BY visit_time, id DESC", visit_params).fetchall()
-    completed_params = [report_date]
-    completed_query = "SELECT name, phone, visit_time FROM leads WHERE visit_status = 'Completed' AND visit_completed_date = ?"
-    if project_filter:
-        completed_query += " AND project_id = ?"
-        completed_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        completed_query += " AND assigned_to = ?"
-        completed_params.append(current_user["username"])
-    completed_rows = conn.execute(completed_query + " ORDER BY visit_time, id DESC", completed_params).fetchall()
-    conn.close()
-    new_count = sum(1 for r in rows if (r["created_at"] or "")[:10] == report_date and (r["previous_note_count"] or 0) == 0)
-    follow_count = sum(1 for r in rows if r["follow_up_date"] == report_date and (r["previous_note_count"] or 0) > 0)
-    from PIL import Image, ImageDraw, ImageFont
-    height = max(900, 260 + len(rows) * 105 + (len(visit_rows) + len(completed_rows)) * 70)
-    image = Image.new("RGB", (1400, height), "white")
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-    y = 35
-    draw.text((40, y), "My Business CRM - Daily Sales Report", fill="#172554", font=font); y += 35
-    draw.text((40, y), f"Date: {report_date}", fill="#475569", font=font); y += 28
-    draw.text((40, y), f"Talked: {len(rows)} | New Lead: {new_count} | Follow-up: {follow_count} | Visit Set: {len(visit_rows)} | Completed: {len(completed_rows)}", fill="#173b70", font=font); y += 40
-    draw.text((40, y), "LEADS", fill="#173b70", font=font); y += 25
-    for i, row in enumerate(rows, 1):
-        phone = row["phone"] or ""
-        local = phone[3:] if phone.startswith("+88") else phone
-        masked = local[:5] + "×××" + local[-3:] if len(local) >= 8 else local
-        typ = "New Lead" if (row["created_at"] or "")[:10] == report_date and (row["previous_note_count"] or 0) == 0 else ("Follow-up" if row["follow_up_date"] == report_date else "Conversation")
-        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {masked} | {row['project_name'] or 'Unassigned'} | {typ}", fill="#172554", font=font); y += 20
-        draw.text((75, y), "Note: " + (row["note"] or "").replace("\n", " ")[:180], fill="#475569", font=font); y += 42
-    y += 10; draw.text((40, y), "VISITS SET", fill="#173b70", font=font); y += 25
-    for i, row in enumerate(visit_rows, 1):
-        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {row['phone'] or ''} | {row['visit_time'] or 'No time'} | {row['visit_status'] or 'Planned'}", fill="#172554", font=font); y += 24
-    y += 10; draw.text((40, y), "VISITS COMPLETED", fill="#173b70", font=font); y += 25
-    for i, row in enumerate(completed_rows, 1):
-        draw.text((50, y), f"{i}. {row['name'] or 'Name not added'} | {row['phone'] or ''} | {row['visit_time'] or 'No time'}", fill="#172554", font=font); y += 24
-    output = io.BytesIO()
-    image.save(output, format="JPEG", quality=92)
-    output.seek(0)
-    return send_file(output, mimetype="image/jpeg", as_attachment=True, download_name=f"daily-sales-report-{report_date}.jpg")
 
 @app.route("/monthly-report")
 def monthly_report():
