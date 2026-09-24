@@ -78,7 +78,8 @@ tbody tr:nth-child(even){background:#f8fafc}
 <div class="small">Professional A4-ready sheet • Premium PDF layout</div>
 </div>
 <div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
-<button class="btn primary" type="button" onclick="savePdfReport()">💾 Save Premium PDF</button>
+<button class="btn primary" type="button" onclick="shareDailyReport()">📤 Share Report</button>
+<button class="btn gold" type="button" onclick="savePdfReport()">💾 Save Premium PDF</button>
 </div>
 </div>
 {% if talked_leads %}
@@ -108,6 +109,41 @@ tbody tr:nth-child(even){background:#f8fafc}
 </div>
 </div>
 <script>
+async function shareDailyReport(){
+    const button = document.querySelector('button[onclick="shareDailyReport()"]');
+    if (button) { button.disabled = true; button.textContent = "⏳ Preparing..."; }
+    try {
+        const rows = [...document.querySelectorAll("#reportTable tbody tr")];
+        const lines = [];
+        lines.push("MY BUSINESS CRM — DAILY SALES REPORT");
+        lines.push("Date: {{ report_date }}{% if project_filter %} — Project: {% for project in projects %}{% if project['id']|string == project_filter %}{{ project['name'] }}{% endif %}{% endfor %}{% endif %}");
+        lines.push("");
+        lines.push("SUMMARY");
+        lines.push("Talked: {{ talked_count }} | New: {{ new_leads_count }} | Follow-up: {{ followup_leads_count }}");
+        lines.push("Visit Set: {{ visits_scheduled }} | Completed: {{ visits_completed }} | Cancelled: {{ cancelled_count }}");
+        lines.push("");
+        lines.push("TALKED LEADS");
+        rows.forEach((row, index) => {
+            const cells = [...row.querySelectorAll("td")].map(td => td.innerText.replace(/\s+/g, " ").trim());
+            if (cells.length) {
+                lines.push((index + 1) + ". " + cells.slice(1).join(" | "));
+            }
+        });
+        const response = await fetch("/share-daily-report", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({text: lines.join("\n")})
+        });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.error || "Share could not be opened");
+    } catch (e) {
+        console.error("Share report error:", e);
+        alert("Report share করা যায়নি: " + e.message);
+    } finally {
+        if (button) { button.disabled = false; button.textContent = "📤 Share Report"; }
+    }
+}
+
 async function savePdfReport(){
     const button = document.querySelector('button[onclick="savePdfReport()"]');
     if (button) { button.disabled = true; button.textContent = "⏳ Creating PDF..."; }
