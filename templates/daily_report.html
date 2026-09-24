@@ -52,10 +52,6 @@ th{background:#f8fafc}
 </form>
 </div>
 
-<div class="card no-print" style="display:flex;gap:10px;flex-wrap:wrap">
-<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Report</button>
-</div>
-
 <div id="printReport">
 <div class="card">
 <div class="print-only" style="font-size:18px;font-weight:bold;margin-bottom:8px">My Business CRM — Daily Sales Report</div>
@@ -71,7 +67,10 @@ th{background:#f8fafc}
 </div>
 
 <div class="card">
-<h3 style="margin-top:0">📋 Talked Leads</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+<h3 style="margin:0">📋 Talked Leads</h3>
+<button class="btn gold no-print" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
+</div>
 {% if talked_leads %}
 <div class="table-wrap">
 <table id="reportTable">
@@ -138,7 +137,7 @@ async function startNativePrint(){
     }finally{
         if (button) {
             button.disabled = false;
-            button.textContent = "🖨️ Print Report";
+            button.textContent = "🖨️ Print Full Sheet";
         }
     }
 }
