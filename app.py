@@ -3377,6 +3377,8 @@ def save_android_pdf_file(file_path):
         values.put("_display_name", os.path.basename(file_path))
         values.put("mime_type", "application/pdf")
         values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Reports")
+        # Explicitly publish the MediaStore row at insert time. This avoids a second
+        # IS_PENDING update, which is rejected by some Android providers.\n        values.put("is_pending", 0)
         # Android 10+ supports the public Downloads collection through
         # MediaStore.  Do not use IS_PENDING here: some WebView/PyJNIus
         # combinations accept the insert but never expose the resulting file.
