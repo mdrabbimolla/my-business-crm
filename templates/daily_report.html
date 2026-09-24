@@ -75,10 +75,9 @@ tbody tr:nth-child(even){background:#f8fafc}
 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
 <div>
 <h3 style="margin:0">📋 Talked Leads — Report Sheet</h3>
-<div class="small">Professional A4-ready sheet • Premium print/PDF layout</div>
+<div class="small">Professional A4-ready sheet • Premium PDF layout</div>
 </div>
 <div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
-<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Premium Sheet</button>
 <button class="btn primary" type="button" onclick="savePdfReport()">💾 Save Premium PDF</button>
 </div>
 </div>
@@ -133,34 +132,6 @@ async function savePdfReport(){
         alert("PDF save করা যায়নি: " + e.message);
     } finally {
         if (button) { button.disabled = false; button.textContent = "💾 Save Premium PDF"; }
-    }
-}
-
-async function startNativePrint(){
-    const button = document.querySelector('button[onclick="startNativePrint()"]');
-    if (button) { button.disabled = true; button.textContent = "⏳ Preparing Print..."; }
-    try{
-        const response = await fetch("/android-print", {cache:"no-store"});
-        const result = await response.json();
-        if (!response.ok || !result.ok || !result.token) throw new Error(result.error || "Print could not be started");
-        const token = result.token;
-        await new Promise(resolve => setTimeout(resolve, 700));
-        const statusResponse = await fetch("/android-print-status/" + encodeURIComponent(token), {cache:"no-store"});
-        const status = await statusResponse.json();
-        if (status.ok) {
-            alert("🖨️ Premium print sheet প্রস্তুত। Android-এর Print screen থেকে printer নির্বাচন করুন।");
-            return;
-        }
-        if (status.cancelled) {
-            alert("Print বাতিল করা হয়েছে।");
-            return;
-        }
-        throw new Error(status.error || "Android Print Service could not accept the job");
-    }catch(e){
-        console.error("Native print error:", e);
-        alert("Print চালু করা যায়নি: " + e.message);
-    }finally{
-        if (button) { button.disabled = false; button.textContent = "🖨️ Print Premium Sheet"; }
     }
 }
 </script>
