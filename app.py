@@ -9,6 +9,9 @@ import os
 import io
 import csv
 import uuid
+import tempfile
+import zipfile
+import shutil
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
 from database import get_db, init_db
@@ -38,9 +41,85 @@ try:
 except ImportError:
     android_activity = None
 
+REMOTE_REPO = "mdrabbimolla/my-business-crm"
+REMOTE_BRANCH = "main"
+RUNTIME_TEMPLATE_DIR = os.path.join(os.path.expanduser("~"), ".mycrm_runtime", "templates")
+RUNTIME_VERSION_FILE = os.path.join(os.path.dirname(RUNTIME_TEMPLATE_DIR), "version.txt")
+
+
+def _remote_update_info():
+    url = f"https://api.github.com/repos/{REMOTE_REPO}/branches/{REMOTE_BRANCH}"
+    request = urllib.request.Request(url, headers={"User-Agent": "My-Business-CRM-Updater", "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(request, timeout=5) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    return payload["commit"]["sha"]
+
+
+def _sync_remote_templates(force=False):
+    try:
+        remote_sha = _remote_update_info()
+        local_sha = ""
+        if os.path.exists(RUNTIME_VERSION_FILE):
+            with open(RUNTIME_VERSION_FILE, "r", encoding="utf-8") as f:
+                local_sha = f.read().strip()
+        if not force and local_sha == remote_sha and os.path.isdir(RUNTIME_TEMPLATE_DIR):
+            return {"ok": True, "updated": False, "sha": remote_sha, "message": "Already up to date"}
+
+        zip_url = f"https://codeload.github.com/{REMOTE_REPO}/zip/{remote_sha}"
+        request = urllib.request.Request(zip_url, headers={"User-Agent": "My-Business-CRM-Updater"})
+        with urllib.request.urlopen(request, timeout=20) as response:
+            archive = response.read()
+
+        runtime_root = os.path.dirname(RUNTIME_TEMPLATE_DIR)
+        os.makedirs(runtime_root, exist_ok=True)
+        staging_root = tempfile.mkdtemp(prefix="mycrm_update_", dir=runtime_root)
+        try:
+            archive_path = os.path.join(staging_root, "repo.zip")
+            with open(archive_path, "wb") as f:
+                f.write(archive)
+            extract_root = os.path.join(staging_root, "extract")
+            os.makedirs(extract_root, exist_ok=True)
+            with zipfile.ZipFile(archive_path, "r") as zf:
+                zf.extractall(extract_root)
+            top_dirs = [os.path.join(extract_root, name) for name in os.listdir(extract_root)]
+            repo_root = next((p for p in top_dirs if os.path.isdir(p)), None)
+            source_templates = os.path.join(repo_root, "templates") if repo_root else None
+            if not source_templates or not os.path.isdir(source_templates):
+                raise RuntimeError("Remote templates folder was not found")
+
+            new_templates = os.path.join(staging_root, "templates")
+            shutil.copytree(source_templates, new_templates)
+            old_templates = RUNTIME_TEMPLATE_DIR + ".old"
+            if os.path.exists(old_templates):
+                shutil.rmtree(old_templates, ignore_errors=True)
+            if os.path.exists(RUNTIME_TEMPLATE_DIR):
+                os.replace(RUNTIME_TEMPLATE_DIR, old_templates)
+            os.replace(new_templates, RUNTIME_TEMPLATE_DIR)
+            shutil.rmtree(old_templates, ignore_errors=True)
+            with open(RUNTIME_VERSION_FILE, "w", encoding="utf-8") as f:
+                f.write(remote_sha)
+        finally:
+            shutil.rmtree(staging_root, ignore_errors=True)
+
+        app.template_folder = RUNTIME_TEMPLATE_DIR
+        app.jinja_loader = app.jinja_env.loader = app.create_global_jinja_loader()
+        return {"ok": True, "updated": True, "sha": remote_sha, "message": "CRM UI updated successfully"}
+    except Exception as exc:
+        print("REMOTE UPDATE ERROR:", repr(exc))
+        return {"ok": False, "updated": False, "message": str(exc) or "Update could not be completed"}
+
+
 app = Flask(__name__)
 
 app.secret_key = "mycrm-secret-key"
+
+# Use the bundled templates immediately; a remote UI update is attempted in the background-safe startup path.
+try:
+    startup_update = _sync_remote_templates()
+    if startup_update.get("ok") and startup_update.get("updated"):
+        print("REMOTE UI UPDATE:", startup_update)
+except Exception as exc:
+    print("REMOTE UI STARTUP UPDATE ERROR:", repr(exc))
 
 
 init_db()
