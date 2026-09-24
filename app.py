@@ -247,11 +247,13 @@ _android_print_status = {}
 _android_print_jobs = {}
 _android_print_adapters = {}
 _android_print_webviews = {}
+_android_print_webviews = {}
 
 
 def _cleanup_android_print(token):
     _android_print_jobs.pop(token, None)
     _android_print_adapters.pop(token, None)
+    _android_print_webviews.pop(token, None)
     _android_print_webviews.pop(token, None)
 
 
