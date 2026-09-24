@@ -10,10 +10,12 @@ from werkzeug.utils import secure_filename
 from database import get_db, init_db
 
 try:
-    from jnius import autoclass, cast
+    from jnius import autoclass, cast, PythonJavaClass, java_method
 except ImportError:
     autoclass = None
     cast = None
+    PythonJavaClass = None
+    java_method = None
 
 try:
     from android.permissions import request_permissions, check_permission, Permission
@@ -26,6 +28,11 @@ try:
     from android.runnable import run_on_ui_thread
 except ImportError:
     run_on_ui_thread = None
+
+try:
+    from android import activity as android_activity
+except ImportError:
+    android_activity = None
 
 app = Flask(__name__)
 
@@ -194,6 +201,175 @@ def share_android_file(file_path, mime_type):
     except Exception as exc:
         print("FILE SHARE ERROR:", exc)
         return False
+
+PROJECT_FILE_PICKER_REQUEST = 18741
+_project_file_picker_status = {}
+_project_file_picker_listeners = {}
+
+def _find_webview(view):
+    try:
+        if "WebView" in str(view.getClass().getName()):
+            return cast("android.webkit.WebView", view)
+    except Exception:
+        pass
+    try:
+        child_count = view.getChildCount()
+    except Exception:
+        return None
+    for index in range(child_count):
+        try:
+            found = _find_webview(view.getChildAt(index))
+            if found is not None:
+                return found
+        except Exception:
+            continue
+    return None
+
+def _reload_webview(url):
+    if autoclass is None or cast is None:
+        return False
+    try:
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = cast("android.app.Activity", PythonActivity.mActivity)
+        root = activity.getWindow().getDecorView()
+        webview = _find_webview(root)
+        if webview is None:
+            return False
+        webview.loadUrl(url)
+        return True
+    except Exception as exc:
+        print("WEBVIEW RELOAD ERROR:", exc)
+        return False
+
+def _android_print_current_page():
+    if autoclass is None or cast is None:
+        return False
+    try:
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = cast("android.app.Activity", PythonActivity.mActivity)
+        root = activity.getWindow().getDecorView()
+        webview = _find_webview(root)
+        if webview is None:
+            return False
+        PrintManager = autoclass("android.print.PrintManager")
+        PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
+        print_manager = cast("android.print.PrintManager", activity.getSystemService("print"))
+        adapter = webview.createPrintDocumentAdapter("My Business CRM - Daily Sales Report")
+        print_manager.print(
+            "My Business CRM - Daily Sales Report",
+            adapter,
+            PrintAttributesBuilder().build()
+        )
+        return True
+    except Exception as exc:
+        print("ANDROID PRINT ERROR:", exc)
+        return False
+
+def _complete_project_file_picker(token, project_id, title, result_code, intent):
+    try:
+        if result_code != -1 or intent is None:
+            _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id}
+            return
+
+        uri = intent.getData()
+        if uri is None:
+            _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id}
+            return
+
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = cast("android.app.Activity", PythonActivity.mActivity)
+        resolver = activity.getContentResolver()
+
+        display_name = None
+        try:
+            OpenableColumns = autoclass("android.provider.OpenableColumns")
+            cursor = resolver.query(uri, [OpenableColumns.DISPLAY_NAME], None, None, None)
+            if cursor is not None:
+                if cursor.moveToFirst():
+                    display_name = cursor.getString(cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+                cursor.close()
+        except Exception:
+            pass
+
+        file_name = display_name or "project_file"
+        safe_name = secure_filename(str(file_name)) or "project_file"
+        ext = project_file_extension(safe_name)
+        if ext not in ALLOWED_PROJECT_FILE_EXTENSIONS:
+            _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id, "error": "Only TXT, PDF, JPG, JPEG and PNG files are allowed"}
+            return
+
+        stream = resolver.openInputStream(uri)
+        data = stream.readAllBytes()
+        stream.close()
+
+        folder = ensure_project_file_dir(project_id)
+        stored_name = uuid.uuid4().hex + "_" + safe_name
+        stored_path = os.path.join(folder, stored_name)
+        with open(stored_path, "wb") as output:
+            output.write(bytes(data))
+
+        mime_type = resolver.getType(uri) or project_file_mime(safe_name)
+        final_title = (title or "").strip() or safe_name
+
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO project_files (project_id,title,item_type,file_name,file_path,mime_type) VALUES (?,?, 'file',?,?,?)",
+            (project_id, final_title, safe_name, stored_path, mime_type)
+        )
+        conn.commit()
+        conn.close()
+
+        _project_file_picker_status[token] = {"done": True, "ok": True, "project_id": project_id}
+    except Exception as exc:
+        print("PROJECT FILE PICKER ERROR:", exc)
+        _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id, "error": "File could not be saved"}
+    finally:
+        if android_activity is not None:
+            listener = _project_file_picker_listeners.pop(token, None)
+            if listener is not None:
+                try:
+                    android_activity.unbind(on_activity_result=listener)
+                except Exception:
+                    pass
+
+def start_android_project_file_picker(project_id, title):
+    if autoclass is None or android_activity is None:
+        return None
+    token = uuid.uuid4().hex
+    _project_file_picker_status[token] = {"done": False, "project_id": project_id}
+    try:
+        Intent = autoclass("android.content.Intent")
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = PythonActivity.mActivity
+        intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+        intent.addCategory(Intent.CATEGORY_OPENABLE)
+        intent.setType("*/*")
+
+        if PythonJavaClass is None or java_method is None:
+            return None
+
+        def on_activity_result(request_code, result_code, data):
+            if request_code == PROJECT_FILE_PICKER_REQUEST:
+                _complete_project_file_picker(token, project_id, title, result_code, data)
+
+        class PickerListener(PythonJavaClass):
+            __javainterfaces__ = ["org/kivy/android/PythonActivity$ActivityResultListener"]
+            __javacontext__ = "app"
+
+            @java_method("(IILandroid/content/Intent;)V")
+            def onActivityResult(self, request_code, result_code, data):
+                on_activity_result(request_code, result_code, data)
+
+        listener = PickerListener()
+        _project_file_picker_listeners[token] = listener
+        android_activity.bind(on_activity_result=listener)
+        activity.startActivityForResult(intent, PROJECT_FILE_PICKER_REQUEST)
+        return token
+    except Exception as exc:
+        print("PROJECT FILE PICKER START ERROR:", exc)
+        _project_file_picker_listeners.pop(token, None)
+        _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id, "error": "File picker could not be opened"}
+        return token
 
 def get_update_info():
     """Check the latest public GitHub Release for a newer APK."""
@@ -930,6 +1106,43 @@ def delete_project(project_id):
     conn.close()
     return redirect("/projects")
 
+
+@app.route("/android-print")
+def android_print():
+    if not session.get("logged_in"):
+        return redirect("/")
+    if run_on_ui_thread is not None:
+        try:
+            run_on_ui_thread(_android_print_current_page)()
+        except Exception as exc:
+            print("PRINT UI THREAD ERROR:", exc)
+    else:
+        _android_print_current_page()
+    return redirect(request.args.get("return_url") or "/daily-report")
+
+@app.route("/android-pick-project-file/<int:project_id>")
+def android_pick_project_file(project_id):
+    if not session.get("logged_in"):
+        return redirect("/")
+    conn = get_db()
+    project = conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,)).fetchone()
+    conn.close()
+    if not project:
+        return "Project not found"
+    title = request.args.get("title", "").strip()
+    token = start_android_project_file_picker(project_id, title)
+    if not token:
+        return "Android file picker is not available"
+    return render_template("project_file_picker.html", token=token)
+
+@app.route("/android-project-file-status/<token>")
+def android_project_file_status(token):
+    if not session.get("logged_in"):
+        return {"done": True, "ok": False, "error": "Not logged in"}
+    status = _project_file_picker_status.get(token)
+    if not status:
+        return {"done": True, "ok": False, "error": "Picker session not found"}
+    return status
 
 @app.route("/project-files/<int:project_id>", methods=["GET", "POST"])
 def project_files(project_id):
