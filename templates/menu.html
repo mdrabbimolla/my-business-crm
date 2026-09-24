@@ -1,99 +1,19 @@
 <!-- Three Dot Menu -->
 
 <style>
-    .menu-button {
-        position: absolute;
-        top: 12px;
-        right: 12px;
-        z-index: 9999;
-
-        width: 42px;
-        height: 42px;
-
-        border: none;
-        border-radius: 50%;
-
-        background: white;
-        color: #172554;
-
-        font-size: 26px;
-        font-weight: bold;
-
-        box-shadow: 0 3px 10px rgba(0,0,0,0.25);
-
-        cursor: pointer;
-    }
-
-    .side-menu {
-        position: fixed;
-        top: 0;
-        left: -280px;
-
-        width: 260px;
-        height: 100vh;
-
-        background: #172554;
-
-        z-index: 9998;
-
-        padding-top: 70px;
-
-        transition: 0.3s;
-
-        box-shadow: 4px 0 15px rgba(0,0,0,0.25);
-    }
-
-    .side-menu.open {
-        left: 0;
-    }
-
-    .side-menu a {
-        display: block;
-
-        padding: 14px 20px;
-
-        color: white;
-
-        text-decoration: none;
-
-        font-size: 16px;
-
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .side-menu a:hover {
-        background: #1e3a8a;
-    }
-
-    .menu-title {
-        color: #d4af37;
-
-        font-size: 20px;
-
-        font-weight: bold;
-
-        padding: 0 20px 20px;
-    }
-
-    .menu-overlay {
-        display: none;
-
-        position: fixed;
-
-        top: 0;
-        left: 0;
-
-        width: 100%;
-        height: 100vh;
-
-        background: rgba(0,0,0,0.35);
-
-        z-index: 9997;
-    }
-
-    .menu-overlay.show {
-        display: block;
-    }
+:root{--navy:#071a3a;--blue:#173b70;--blue2:#2563a8;--gold:#d4af37;--gold2:#f3d36a}
+.menu-button{position:fixed;top:12px;right:12px;z-index:9999;width:44px;height:44px;border:1px solid rgba(255,255,255,.55);border-radius:14px;background:rgba(255,255,255,.96);color:#172554;font-size:25px;font-weight:900;box-shadow:0 7px 20px rgba(0,0,0,.18);cursor:pointer;transition:.18s}
+.menu-button:active{transform:scale(.94)}
+.side-menu{position:fixed;top:0;left:-310px;width:290px;height:100vh;background:linear-gradient(180deg,#071a3a 0%,#102d5b 100%);z-index:9998;padding:20px 12px 25px;transition:.28s cubic-bezier(.2,.8,.2,1);box-shadow:8px 0 30px rgba(0,0,0,.28);overflow:auto}
+.side-menu.open{left:0}
+.menu-title{color:white;font-size:18px;font-weight:900;padding:8px 12px 18px;margin-bottom:8px;border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:9px}
+.menu-title:after{content:"SALES CRM";margin-left:auto;font-size:9px;letter-spacing:1px;color:#f3d36a;background:rgba(212,175,55,.12);padding:5px 7px;border-radius:8px}
+.side-menu a{display:flex;align-items:center;gap:10px;padding:12px 13px;margin:3px 0;color:#eaf2ff;text-decoration:none;font-size:14px;font-weight:700;border:1px solid transparent;border-radius:11px}
+.side-menu a:hover,.side-menu a.menu-active{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.10);color:#fff}
+.side-menu a.menu-active{box-shadow:inset 3px 0 0 var(--gold);color:#f7db73}
+.menu-overlay{display:none;position:fixed;inset:0;background:rgba(2,8,23,.55);backdrop-filter:blur(2px);z-index:9997}
+.menu-overlay.show{display:block}
+@media(max-width:480px){.side-menu{width:84vw;max-width:300px}}
 </style>
 
 
@@ -117,9 +37,7 @@
     class="side-menu"
 >
 
-    <div class="menu-title">
-        🏢 My Business CRM
-    </div>
+    <div class="menu-title">🏢 My Business CRM</div>
 
     <a href="/dashboard">
         🏠 Dashboard
@@ -180,6 +98,7 @@
 
 
 <script>
+    (function(){var p=window.location.pathname;document.querySelectorAll(".side-menu a").forEach(function(a){if(a.getAttribute("href")===p)a.classList.add("menu-active")})})();
     function toggleMenu() {
 
         document
