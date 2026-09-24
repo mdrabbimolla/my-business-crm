@@ -71,7 +71,7 @@ th{background:#f8fafc}
 <h3 style="margin:0">📋 Talked Leads</h3>
 <div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
 <button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
-<a class="btn primary" href="/daily-report-share?date={{ report_date }}{% if project_filter %}&project_id={{ project_filter }}{% endif %}">📤 Send Report</a>
+<button class="btn primary" type="button" onclick="sendPdfReport()">📄 Send PDF Report</button>
 </div>
 </div>
 {% if talked_leads %}
@@ -101,47 +101,57 @@ th{background:#f8fafc}
 </div>
 </div>
 <script>
+async function sendPdfReport(){
+    const button = document.querySelector('button[onclick="sendPdfReport()"]');
+    if (button) { button.disabled = true; button.textContent = "⏳ Creating PDF..."; }
+    try {
+        const params = new URLSearchParams({date: "{{ report_date }}"});
+        {% if project_filter %}params.set("project_id", "{{ project_filter }}");{% endif %}
+        const response = await fetch("/daily-report-pdf?" + params.toString(), {cache:"no-store"});
+        const result = await response.json();
+        if (!response.ok || !result.ok || !result.token) throw new Error(result.error || "PDF could not be started");
+        for (let attempt = 0; attempt < 40; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const statusResponse = await fetch("/daily-report-pdf-status/" + encodeURIComponent(result.token), {cache:"no-store"});
+            const status = await statusResponse.json();
+            if (status.done) {
+                if (status.ok) return;
+                throw new Error(status.error || "PDF could not be created");
+            }
+        }
+        throw new Error("PDF creation is taking too long");
+    } catch (e) {
+        console.error("PDF report error:", e);
+        alert("PDF তৈরি করা যায়নি: " + e.message);
+    } finally {
+        if (button) { button.disabled = false; button.textContent = "📄 Send PDF Report"; }
+    }
+}
+
 async function startNativePrint(){
     const button = document.querySelector('button[onclick="startNativePrint()"]');
-    if (button) {
-        button.disabled = true;
-        button.textContent = "⏳ Preparing Print...";
-    }
+    if (button) { button.disabled = true; button.textContent = "⏳ Preparing Print..."; }
     try{
         const response = await fetch("/android-print", {cache:"no-store"});
         const result = await response.json();
-        if (!response.ok || !result.ok || !result.token) {
-            throw new Error(result.error || "Print could not be started");
-        }
-
+        if (!response.ok || !result.ok || !result.token) throw new Error(result.error || "Print could not be started");
         const token = result.token;
         for (let attempt = 0; attempt < 60; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 500));
-            const statusResponse = await fetch(
-                "/android-print-status/" + encodeURIComponent(token),
-                {cache:"no-store"}
-            );
+            const statusResponse = await fetch("/android-print-status/" + encodeURIComponent(token), {cache:"no-store"});
             const status = await statusResponse.json();
-
             if (status.done) {
                 if (status.ok) return;
-                if (status.cancelled) {
-                    alert("Print বাতিল করা হয়েছে।");
-                } else {
-                    alert("Print চালু করা যায়নি: " + (status.error || "Unknown error"));
-                }
-                return;
+                if (status.cancelled) { alert("Print বাতিল করা হয়েছে।"); return; }
+                alert("Print চালু করা যায়নি: " + (status.error || "Unknown error")); return;
             }
         }
-        alert("Android Print Service-এর উত্তর পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন.");
+        alert("Android Print Service-এর উত্তর পাওয়া যাচ্ছে না।");
     }catch(e){
         console.error("Native print error:", e);
-        alert("Print চালু করা যায়নি। Android Print Service চালু আছে কি না দেখুন.");
+        alert("Print চালু করা যায়নি: " + e.message);
     }finally{
-        if (button) {
-            button.disabled = false;
-            button.textContent = "🖨️ Print Full Sheet";
-        }
+        if (button) { button.disabled = false; button.textContent = "🖨️ Print Full Sheet"; }
     }
 }
 </script>
