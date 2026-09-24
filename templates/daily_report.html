@@ -53,7 +53,7 @@ th{background:#f8fafc}
 </div>
 
 <div class="card no-print" style="display:flex;gap:10px;flex-wrap:wrap">
-<a class="btn gold" href="/android-print?return_url={{ request.full_path|urlencode }}">🖨️ Print Report</a>
+<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Report</button>
 </div>
 
 <div id="printReport">
@@ -98,6 +98,14 @@ th{background:#f8fafc}
 </div>
 </div>
 </div>
-<script></script>
+<script>
+async function startNativePrint(){
+    try{
+        await fetch("/android-print", {cache:"no-store"});
+    }catch(e){
+        alert("Print could not be started. Please try again.");
+    }
+}
+</script>
 </body>
 </html>
