@@ -1,8 +1,5 @@
 from datetime import date
-f
-_android_pdf_status = {}
-_android_pdf_reports = {}
-rom urllib.parse import quote
+from urllib.parse import quote
 import json
 import urllib.request
 import os
