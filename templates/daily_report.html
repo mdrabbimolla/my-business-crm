@@ -101,9 +101,13 @@ th{background:#f8fafc}
 <script>
 async function startNativePrint(){
     try{
-        await fetch("/android-print", {cache:"no-store"});
+        const response = await fetch("/android-print", {cache:"no-store"});
+        const result = await response.json();
+        if (!result.ok) {
+            alert("Print চালু করা যায়নি। Android Print Service চালু আছে কি না দেখুন.");
+        }
     }catch(e){
-        alert("Print could not be started. Please try again.");
+        alert("Print চালু করা যায়নি।");
     }
 }
 </script>
