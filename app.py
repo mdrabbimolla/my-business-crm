@@ -250,20 +250,28 @@ def _android_print_current_page():
         root = activity.getWindow().getDecorView()
         webview = _find_webview(root)
         if webview is None:
+            print("ANDROID PRINT ERROR: WebView not found")
             return False
-        PrintManager = autoclass("android.print.PrintManager")
+
         PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
-        print_manager = cast("android.print.PrintManager", activity.getSystemService("print"))
+        print_manager = activity.getSystemService("print")
+        if print_manager is None:
+            print("ANDROID PRINT ERROR: Android PrintManager is unavailable")
+            return False
+
         adapter = webview.createPrintDocumentAdapter("My Business CRM - Daily Sales Report")
-        print_manager.print(
-            "My Business CRM - Daily Sales Report",
-            adapter,
-            PrintAttributesBuilder().build()
-        )
+        attributes = PrintAttributesBuilder().build()
+        print_manager.print("My Business CRM - Daily Sales Report", adapter, attributes)
+        print("ANDROID PRINT: print job submitted")
         return True
     except Exception as exc:
-        print("ANDROID PRINT ERROR:", exc)
+        print("ANDROID PRINT ERROR:", repr(exc))
         return False
+
+if run_on_ui_thread is not None:
+    _android_print_current_page_ui = run_on_ui_thread(_android_print_current_page)
+else:
+    _android_print_current_page_ui = _android_print_current_page
 
 def _complete_project_file_picker(token, project_id, title, result_code, intent):
     try:
@@ -1110,15 +1118,13 @@ def delete_project(project_id):
 @app.route("/android-print")
 def android_print():
     if not session.get("logged_in"):
-        return redirect("/")
-    if run_on_ui_thread is not None:
-        try:
-            run_on_ui_thread(_android_print_current_page)()
-        except Exception as exc:
-            print("PRINT UI THREAD ERROR:", exc)
-    else:
-        _android_print_current_page()
-    return redirect(request.args.get("return_url") or "/daily-report")
+        return {"ok": False, "error": "Not logged in"}, 401
+    try:
+        _android_print_current_page_ui()
+        return {"ok": True}
+    except Exception as exc:
+        print("PRINT UI THREAD ERROR:", repr(exc))
+        return {"ok": False, "error": "Print could not be started"}, 500
 
 @app.route("/android-pick-project-file/<int:project_id>")
 def android_pick_project_file(project_id):
