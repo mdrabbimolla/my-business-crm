@@ -8,6 +8,7 @@ import uuid
 import tempfile
 import zipfile
 import shutil
+import ssl
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
 from database import get_db, init_db
@@ -3279,6 +3280,16 @@ def reassign_lead(lead_id):
         lead=lead,
         sales_users=sales_users
     )
+def _https_context():
+    """Create a verified HTTPS context using the bundled CA certificate store."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception as exc:
+        print("CERTIFI CONTEXT ERROR:", repr(exc))
+        return ssl.create_default_context()
+
+
 REMOTE_REPO = "mdrabbimolla/my-business-crm"
 REMOTE_BRANCH = "main"
 RUNTIME_TEMPLATE_DIR = os.path.join(os.path.expanduser("~"), ".mycrm_runtime", "templates")
@@ -3288,7 +3299,7 @@ RUNTIME_VERSION_FILE = os.path.join(os.path.dirname(RUNTIME_TEMPLATE_DIR), "vers
 def _remote_update_info():
     url = f"https://api.github.com/repos/{REMOTE_REPO}/branches/{REMOTE_BRANCH}"
     request = urllib.request.Request(url, headers={"User-Agent": "My-Business-CRM-Updater", "Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(request, timeout=5) as response:
+    with urllib.request.urlopen(request, timeout=5, context=_https_context()) as response:
         payload = json.loads(response.read().decode("utf-8"))
     return payload["commit"]["sha"]
 
@@ -3305,7 +3316,7 @@ def _sync_remote_templates(force=False):
 
         zip_url = f"https://codeload.github.com/{REMOTE_REPO}/zip/{remote_sha}"
         request = urllib.request.Request(zip_url, headers={"User-Agent": "My-Business-CRM-Updater"})
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=20, context=_https_context()) as response:
             archive = response.read()
 
         runtime_root = os.path.dirname(RUNTIME_TEMPLATE_DIR)
