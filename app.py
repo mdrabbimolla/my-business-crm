@@ -288,7 +288,12 @@ def _android_print_current_page(token):
         )
         _android_print_adapters[token] = adapter
         _android_print_jobs[token] = print_job
-        _android_print_status[token] = {"done": False, "ok": True, "message": "Print job submitted"}
+        _android_print_status[token] = {
+            "done": True,
+            "ok": True,
+            "submitted": True,
+            "message": "Android Print Service accepted the print job"
+        }
         print("ANDROID PRINT: print job submitted successfully")
     except Exception as exc:
         print("ANDROID PRINT ERROR:", repr(exc))
@@ -3392,16 +3397,25 @@ def save_android_pdf_file(file_path):
         try:
             stream = resolver.openOutputStream(uri)
             if stream is None:
+                try:
+                    resolver.delete(uri, None, None)
+                except Exception:
+                    pass
                 return False
-            with open(file_path, "rb") as source:
-                stream.write(source.read())
-            stream.close()
             try:
-                done_values = ContentValues()
-                done_values.put("is_pending", 0)
-                resolver.update(uri, done_values, None, None)
-            except Exception:
-                pass
+                with open(file_path, "rb") as source:
+                    while True:
+                        chunk = source.read(64 * 1024)
+                        if not chunk:
+                            break
+                        stream.write(bytearray(chunk))
+                stream.flush()
+            finally:
+                stream.close()
+
+            done_values = ContentValues()
+            done_values.put("is_pending", 0)
+            resolver.update(uri, done_values, None, None)
             return True
         except Exception:
             try:
@@ -3434,47 +3448,98 @@ def _create_daily_report_pdf(token, report):
         PdfDocument = autoclass("android.graphics.pdf.PdfDocument")
         Paint = autoclass("android.graphics.Paint")
         Typeface = autoclass("android.graphics.Typeface")
+        RectF = autoclass("android.graphics.RectF")
         pdf = PdfDocument()
         page_width, page_height = 595, 842
         margin = 28
         page_no = 1
         y = margin
 
+        navy = 0xFF172554
+        gold = 0xFFD4AF37
+        slate = 0xFF475569
+        light = 0xFFF8FAFC
+        white = 0xFFFFFFFF
+
         title_paint = Paint()
-        title_paint.setTextSize(18)
+        title_paint.setTextSize(19)
         title_paint.setTypeface(Typeface.DEFAULT_BOLD)
+        title_paint.setColor(navy)
+
+        sub_paint = Paint()
+        sub_paint.setTextSize(9)
+        sub_paint.setColor(slate)
+
         body_paint = Paint()
-        body_paint.setTextSize(9)
+        body_paint.setTextSize(8.5)
+        body_paint.setColor(navy)
+
         header_paint = Paint()
-        header_paint.setTextSize(9)
+        header_paint.setTextSize(8)
         header_paint.setTypeface(Typeface.DEFAULT_BOLD)
+        header_paint.setColor(white)
+
+        line_paint = Paint()
+        line_paint.setColor(0xFFE2E8F0)
+        line_paint.setStrokeWidth(1)
+
+        fill_paint = Paint()
+        fill_paint.setColor(light)
+
+        gold_paint = Paint()
+        gold_paint.setColor(gold)
+
+        navy_paint = Paint()
+        navy_paint.setColor(navy)
 
         def start_page():
             nonlocal page_no, y
             info = PdfDocument.PageInfo.Builder(page_width, page_height, page_no).create()
             page = pdf.startPage(info)
             y = margin
-            page_no += 1
             return page
 
         page = start_page()
         canvas = page.getCanvas()
-        canvas.drawText("My Business CRM - Daily Sales Report", margin, y, title_paint)
-        y += 24
-        canvas.drawText("Report Date: " + report["date"], margin, y, body_paint)
-        y += 18
-        if report.get("project"):
-            canvas.drawText("Project: " + report["project"], margin, y, body_paint)
-            y += 18
-        canvas.drawText(
-            "Talked: {}   New: {}   Follow-up: {}   Visit Set: {}   Completed: {}   Cancelled: {}".format(
-                report["talked"], report["new"], report["followup"], report["visits"], report["completed"], report["cancelled"]
-            ),
-            margin, y, body_paint
-        )
-        y += 24
 
-        columns = [("#", 25), ("Name", 105), ("Phone", 85), ("Project", 90), ("Type", 70), ("Visit", 75), ("Done", 45), ("Note", 72)]
+        def draw_top_brand():
+            nonlocal y
+            canvas.drawRect(0, 0, page_width, 68, navy_paint)
+            canvas.drawRect(0, 64, page_width, 68, gold_paint)
+            canvas.drawText("My Business CRM", margin, 28, header_paint)
+            canvas.drawText("DAILY SALES REPORT", margin, 49, header_paint)
+            y = 92
+
+        def draw_summary():
+            nonlocal y
+            summary = [
+                ("Talked", report["talked"]),
+                ("New", report["new"]),
+                ("Follow-up", report["followup"]),
+                ("Visit Set", report["visits"]),
+                ("Completed", report["completed"]),
+                ("Cancelled", report["cancelled"]),
+            ]
+            box_w = (page_width - 2 * margin - 5 * 8) / 6.0
+            x = margin
+            for label, value in summary:
+                canvas.drawRoundRect(RectF(x, y, x + box_w, y + 43), 6, 6, fill_paint)
+                canvas.drawText(str(value), x + 7, y + 17, title_paint)
+                canvas.drawText(label, x + 7, y + 34, sub_paint)
+                x += box_w + 8
+            y += 56
+
+        draw_top_brand()
+        canvas.drawText("Report Date: " + report["date"], margin, y, sub_paint)
+        if report.get("project"):
+            canvas.drawText("Project: " + report["project"], margin + 145, y, sub_paint)
+        y += 18
+        draw_summary()
+
+        columns = [
+            ("#", 25), ("Name", 98), ("Phone", 78), ("Project", 92),
+            ("Type", 67), ("Visit", 72), ("Done", 40), ("Note", 95)
+        ]
         x_positions = []
         x = margin
         for _, width in columns:
@@ -3484,28 +3549,38 @@ def _create_daily_report_pdf(token, report):
 
         def draw_header():
             nonlocal y
-            canvas.drawLine(margin, y - 10, right, y - 10, header_paint)
+            canvas.drawRect(margin, y - 13, right, y + 7, navy_paint)
             for idx, (label, _) in enumerate(columns):
-                canvas.drawText(label, x_positions[idx], y, header_paint)
-            y += 15
-            canvas.drawLine(margin, y - 6, right, y - 6, header_paint)
+                canvas.drawText(label, x_positions[idx] + 3, y + 1, header_paint)
+            y += 18
+            canvas.drawLine(margin, y, right, y, line_paint)
 
         draw_header()
+
         for row in report["rows"]:
-            if y > page_height - 45:
+            if y > page_height - 48:
+                footer = Paint()
+                footer.setTextSize(7)
+                footer.setColor(slate)
+                canvas.drawText("My Business CRM • Page " + str(page_no), margin, page_height - 18, footer)
                 pdf.finishPage(page)
                 page = start_page()
                 canvas = page.getCanvas()
-                canvas.drawText("My Business CRM - Daily Sales Report (continued)", margin, y, title_paint)
-                y += 24
+                draw_top_brand()
+                canvas.drawText("Report Date: " + report["date"] + " • Continued", margin, y, sub_paint)
+                y += 22
                 draw_header()
-            values = [row["no"], row["name"], row["phone"], row["project"], row["type"], row["visit"], row["done"], row["note"]]
+
+            values = [
+                row["no"], row["name"], row["phone"], row["project"],
+                row["type"], row["visit"], row["done"], row["note"]
+            ]
             row_y = y
             max_lines = 1
             for idx, value in enumerate(values):
                 text_value = str(value or "-").replace("\\n", " ")
                 width = columns[idx][1]
-                max_chars = max(4, int(width / 5.3))
+                max_chars = max(4, int(width / 5.0))
                 chunks = []
                 while len(text_value) > max_chars:
                     cut = text_value.rfind(" ", 0, max_chars)
@@ -3515,31 +3590,48 @@ def _create_daily_report_pdf(token, report):
                     text_value = text_value[cut:].strip()
                 chunks.append(text_value)
                 for line_idx, chunk in enumerate(chunks[:3]):
-                    canvas.drawText(chunk, x_positions[idx], row_y + line_idx * 11, body_paint)
+                    canvas.drawText(chunk, x_positions[idx] + 3, row_y + line_idx * 10, body_paint)
                 max_lines = max(max_lines, min(3, len(chunks)))
-            y += max_lines * 11 + 8
-            canvas.drawLine(margin, y - 4, right, y - 4, body_paint)
+            y += max_lines * 10 + 8
+            canvas.drawLine(margin, y - 4, right, y - 4, line_paint)
 
+        footer = Paint()
+        footer.setTextSize(7)
+        footer.setColor(slate)
+        canvas.drawText("My Business CRM • Page " + str(page_no), margin, page_height - 18, footer)
         pdf.finishPage(page)
+
         out_dir = os.path.join("/tmp", "mycrm_reports")
         os.makedirs(out_dir, exist_ok=True)
         filename = "Daily_Report_" + report["date"] + ".pdf"
         path = os.path.join(out_dir, filename)
-        output = open(path, "wb")
-        pdf.writeTo(output)
-        output.close()
+        with open(path, "wb") as output:
+            pdf.writeTo(output)
         pdf.close()
 
         ok = save_android_pdf_file(path)
         if ok:
-            _android_pdf_status[token] = {"done": True, "ok": True, "message": "PDF saved to Downloads/My Business CRM/Reports"}
+            _android_pdf_status[token] = {
+                "done": True,
+                "ok": True,
+                "message": "Premium PDF saved to Downloads/My Business CRM/Reports"
+            }
         else:
-            _android_pdf_status[token] = {"done": True, "ok": False, "error": "PDF was created but could not be saved to phone storage"}
+            _android_pdf_status[token] = {
+                "done": True,
+                "ok": False,
+                "error": "PDF was created but could not be saved to phone storage"
+            }
     except Exception as exc:
         print("PDF REPORT ERROR:", repr(exc))
-        _android_pdf_status[token] = {"done": True, "ok": False, "error": str(exc) or "PDF could not be created"}
+        _android_pdf_status[token] = {
+            "done": True,
+            "ok": False,
+            "error": str(exc) or "PDF could not be created"
+        }
     finally:
         _android_pdf_reports.pop(token, None)
+
 @app.route("/daily-report-pdf")
 def daily_report_pdf():
     if not session.get("logged_in"):
