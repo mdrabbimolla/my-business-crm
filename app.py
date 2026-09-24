@@ -3395,19 +3395,14 @@ def save_android_pdf_file(file_path):
             raise RuntimeError("MediaStore could not open the PDF for writing")
 
         try:
-            fd = pfd.getFileDescriptor()
-            FileOutputStream = autoclass("java.io.FileOutputStream")
-            stream = FileOutputStream(fd)
-            try:
+            # Use ParcelFileDescriptor.getFd() + a duplicated native fd.
+            # This avoids PyJNIus byte[]/OutputStream overload issues.
+            native_fd = int(pfd.getFd())
+            with os.fdopen(os.dup(native_fd), "wb", closefd=True) as target:
                 with open(file_path, "rb") as source:
-                    while True:
-                        chunk = source.read(64 * 1024)
-                        if not chunk:
-                            break
-                        stream.write(bytearray(chunk))
-                stream.flush()
-            finally:
-                stream.close()
+                    shutil.copyfileobj(source, target, length=64 * 1024)
+                target.flush()
+                os.fsync(target.fileno())
         finally:
             pfd.close()
 
