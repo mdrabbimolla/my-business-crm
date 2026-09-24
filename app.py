@@ -3409,9 +3409,10 @@ def save_android_pdf_file(file_path):
             finally:
                 stream.close()
 
-            done_values = ContentValues()
-            done_values.put("is_pending", 0)
-            resolver.update(uri, done_values, None, None)
+            # The row was inserted without IS_PENDING, so do not update it here.
+            # Some Android MediaStore providers reject an IS_PENDING update on a
+            # completed Downloads row; that exception would otherwise delete the
+            # PDF we just wrote and report a false failure.
             return True
         except Exception:
             try:
