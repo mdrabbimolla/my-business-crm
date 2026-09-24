@@ -49,7 +49,6 @@ jobs:
       - name: Prepare CRM
         run: |
           test -f app.py
-          python3 -c 'from pathlib import Path; p=Path("app.py"); s=p.read_text(encoding="utf-8"); old="        with open(path, \\"wb\\") as output:\\n            pdf.writeTo(output)\\n        pdf.close()\\n"; new="        FileOutputStream = autoclass(\\"java.io.FileOutputStream\\")\\n        output = FileOutputStream(path)\\n        try:\\n            pdf.writeTo(output)\\n            output.flush()\\n        finally:\\n            output.close()\\n            pdf.close()\\n"; assert old in s, "Expected PDF write block was not found"; p.write_text(s.replace(old,new,1), encoding="utf-8"); print("PDF ROOT-CAUSE FIX APPLIED: java.io.FileOutputStream")'
           cp app.py main.py
           test -s main.py
           mkdir -p apk-output
