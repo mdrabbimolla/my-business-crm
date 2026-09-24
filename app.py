@@ -523,3 +523,9 @@ def daily_report_pdf_status(token):
 
 
 
+
+
+if __name__ == "__main__":
+    # Start the Flask server explicitly for the Android WebView bootstrap.
+    # Keep startup local and synchronous; no network/update work runs here.
+    app.run(host="0.0.0.0", port=5000, debug=False)
