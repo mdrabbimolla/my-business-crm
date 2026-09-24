@@ -102,7 +102,7 @@ th{background:#f8fafc}
 </div>
 <script>
 async function savePdfReport(){
-    const button = document.querySelector('button[onclick="sendPdfReport()"]');
+    const button = document.querySelector('button[onclick="savePdfReport()"]');
     if (button) { button.disabled = true; button.textContent = "⏳ Creating PDF..."; }
     try {
         const params = new URLSearchParams({date: "{{ report_date }}"});
@@ -115,7 +115,7 @@ async function savePdfReport(){
             const statusResponse = await fetch("/daily-report-pdf-status/" + encodeURIComponent(result.token), {cache:"no-store"});
             const status = await statusResponse.json();
             if (status.done) {
-                if (status.ok) return;
+                if (status.ok) { alert("✅ PDF saved to Downloads/My Business CRM/Reports"); return; }
                 throw new Error(status.error || "PDF could not be created");
             }
         }
@@ -124,7 +124,7 @@ async function savePdfReport(){
         console.error("PDF save error:", e);
         alert("PDF save করা যায়নি: " + e.message);
     } finally {
-        if (button) { button.disabled = false; button.textContent = "📄 Send PDF Report"; }
+        if (button) { button.disabled = false; button.textContent = "💾 Save PDF Report"; }
     }
 }
 
