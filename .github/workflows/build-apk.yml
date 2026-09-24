@@ -89,3 +89,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "v1.0.${{ github.run_number }}" apk-output/*.apk             --title "My Business CRM v1.0.${{ github.run_number }}"             --notes "Automatic APK release for build ${{ github.run_number }}."
+
+# Build trigger verification
