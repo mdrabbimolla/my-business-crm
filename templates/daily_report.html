@@ -69,7 +69,10 @@ th{background:#f8fafc}
 <div class="card">
 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
 <h3 style="margin:0">📋 Talked Leads</h3>
-<button class="btn gold no-print" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
+<div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
+<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
+<a class="btn primary" href="/daily-report-share?date={{ report_date }}{% if project_filter %}&project_id={{ project_filter }}{% endif %}">📤 Send Report</a>
+</div>
 </div>
 {% if talked_leads %}
 <div class="table-wrap">
@@ -82,7 +85,7 @@ th{background:#f8fafc}
 <td>{{ lead['name'] or 'Name not added' }}</td>
 <td>{% set local_phone = lead['phone'][3:] if lead['phone'] and lead['phone'].startswith('+88') else (lead['phone'] or '') %}{{ local_phone[:5] }}{% if local_phone|length >= 8 %}×××{{ local_phone[-3:] }}{% endif %}</td>
 <td>{{ lead['project_name'] or 'Unassigned' }}</td>
-<td>{% if (lead['created_at'] or '')[:10] == report_date and (lead['previous_note_count'] or 0) == 0 %}New Lead{% elif lead['follow_up_date'] == report_date %}Follow-up{% else %}Conversation{% endif %}</td>
+<td>{% if (lead['created_at'] or '')[:10] == report_date %}New Lead{% elif lead['follow_up_date'] == report_date %}Follow-up{% else %}Conversation{% endif %}</td>
 <td>{% if lead['visit_date'] %}{{ lead['visit_date'] }}{% if lead['visit_time'] %} {{ lead['visit_time'] }}{% endif %}{% else %}—{% endif %}</td>
 <td>{% if lead['visit_status'] == 'Completed' and lead['visit_completed_date'] == report_date %}Yes{% else %}—{% endif %}</td>
 <td class="note">{{ lead['note'] }}</td>
