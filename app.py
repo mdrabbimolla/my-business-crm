@@ -4,6 +4,7 @@ import json
 import urllib.request
 import os
 import io
+import csv
 import uuid
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
@@ -247,13 +248,11 @@ _android_print_status = {}
 _android_print_jobs = {}
 _android_print_adapters = {}
 _android_print_webviews = {}
-_android_print_webviews = {}
 
 
 def _cleanup_android_print(token):
     _android_print_jobs.pop(token, None)
     _android_print_adapters.pop(token, None)
-    _android_print_webviews.pop(token, None)
     _android_print_webviews.pop(token, None)
 
 
@@ -1180,6 +1179,69 @@ def delete_project(project_id):
     conn.close()
     return redirect("/projects")
 
+
+@app.route("/daily-report-share")
+def daily_report_share():
+    if not session.get("logged_in"):
+        return redirect("/")
+
+    report_date = request.args.get("date") or date.today().isoformat()
+    project_filter = request.args.get("project_id", "").strip()
+    conn = get_db()
+    current_user = conn.execute("SELECT * FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
+    if not current_user:
+        conn.close()
+        return "User not found"
+
+    params = [report_date, report_date]
+    query = """
+        SELECT leads.name, leads.phone, projects.name AS project_name,
+               leads.created_at, leads.follow_up_date,
+               leads.visit_date, leads.visit_time, leads.visit_status,
+               leads.visit_completed_date, ln.note
+        FROM lead_notes ln
+        JOIN leads ON leads.id = ln.lead_id
+        LEFT JOIN projects ON projects.id = leads.project_id
+        WHERE ln.note_date = ?
+          AND ln.id = (SELECT MAX(ln2.id) FROM lead_notes ln2 WHERE ln2.lead_id = ln.lead_id AND ln2.note_date = ?)
+    """
+    if project_filter:
+        query += " AND leads.project_id = ?"
+        params.append(project_filter)
+    if current_user["role"] == "Sales":
+        query += " AND leads.assigned_to = ?"
+        params.append(current_user["username"])
+    query += " ORDER BY projects.name ASC, leads.id DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["My Business CRM - Daily Sales Report"])
+    writer.writerow(["Report Date", report_date])
+    writer.writerow([])
+    writer.writerow(["#", "Name", "Phone", "Project", "Type", "Visit Set", "Complete Visit", "Updated Note"])
+    for idx, lead in enumerate(rows, 1):
+        created_date = (lead["created_at"] or "")[:10]
+        if created_date == report_date:
+            lead_type = "New Lead"
+        elif lead["follow_up_date"] == report_date:
+            lead_type = "Follow-up"
+        else:
+            lead_type = "Conversation"
+        visit_set = "—"
+        if lead["visit_date"]:
+            visit_set = lead["visit_date"] + ((" " + lead["visit_time"]) if lead["visit_time"] else "")
+        completed = "Yes" if lead["visit_status"] == "Completed" and lead["visit_completed_date"] == report_date else "—"
+        writer.writerow([idx, lead["name"] or "Name not added", lead["phone"] or "", lead["project_name"] or "Unassigned", lead_type, visit_set, completed, lead["note"] or ""])
+
+    path = os.path.join("/tmp", "mycrm_daily_report.csv")
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(output.getvalue())
+    ok = share_android_file(path, "text/csv")
+    if ok:
+        return "<h3>📤 Report share খুলছে...</h3><a href='/daily-report?date=" + report_date + ("&project_id=" + project_filter if project_filter else "") + "'>← Back to Report</a>"
+    return "<h3>⚠️ Report share চালু করা যায়নি</h3><a href='/daily-report?date=" + report_date + "'>← Back to Report</a>"
 
 @app.route("/android-print")
 def android_print():
