@@ -247,54 +247,47 @@ _android_print_adapters = []
 
 
 def _android_print_current_page():
+    """Run the complete WebView print operation on Android's UI thread."""
     if autoclass is None or cast is None:
+        print("ANDROID PRINT ERROR: PyJNIus is unavailable")
         return False
     try:
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        Context = autoclass("android.content.Context")
-        PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
-
         activity = cast("android.app.Activity", PythonActivity.mActivity)
+
+        # WebView APIs must be called from the thread that created the WebView.
         root = activity.getWindow().getDecorView()
         webview = _find_webview(root)
         if webview is None:
-            print("ANDROID PRINT ERROR: WebView not found")
+            print("ANDROID PRINT ERROR: WebView not found on UI thread")
             return False
 
-        # WebView printing must be initiated on the WebView's original UI thread.
-        adapter = webview.createPrintDocumentAdapter(
-            "My Business CRM - Daily Sales Report"
-        )
-
-        service = activity.getSystemService(Context.PRINT_SERVICE)
-        if service is None:
-            print("ANDROID PRINT ERROR: PrintManager service unavailable")
+        PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
+        print_manager = activity.getSystemService("print")
+        if print_manager is None:
+            print("ANDROID PRINT ERROR: PrintManager unavailable")
             return False
 
-        print_manager = cast("android.print.PrintManager", service)
+        adapter = webview.createPrintDocumentAdapter("My Business CRM - Daily Sales Report")
+        if adapter is None:
+            print("ANDROID PRINT ERROR: PrintDocumentAdapter is null")
+            return False
+
         attributes = PrintAttributesBuilder().build()
-        job = print_manager.print(
-            "My Business CRM - Daily Sales Report",
-            adapter,
-            attributes
-        )
-
-        # Keep strong Python references while Android processes the job.
-        _android_print_adapters.append(adapter)
-        _android_print_jobs.append(job)
-        if len(_android_print_jobs) > 5:
-            del _android_print_jobs[:-5]
-            del _android_print_adapters[:-5]
-
-        print("ANDROID PRINT: print job submitted")
+        print_manager.print("My Business CRM - Daily Sales Report", adapter, attributes)
+        print("ANDROID PRINT: print job submitted successfully")
         return True
     except Exception as exc:
         print("ANDROID PRINT ERROR:", repr(exc))
         return False
 
-
+# Dispatch the ENTIRE operation to Android's UI thread. This is important:
+# createPrintDocumentAdapter() itself is a WebView API and cannot safely be
+# created from the Flask request thread.
 if run_on_ui_thread is not None:
-    _android_print_current_page_ui = run_on_ui_thread(_android_print_current_page)
+    @run_on_ui_thread
+    def _android_print_current_page_ui():
+        return _android_print_current_page()
 else:
     _android_print_current_page_ui = _android_print_current_page
 
