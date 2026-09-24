@@ -100,14 +100,46 @@ th{background:#f8fafc}
 </div>
 <script>
 async function startNativePrint(){
+    const button = document.querySelector('button[onclick="startNativePrint()"]');
+    if (button) {
+        button.disabled = true;
+        button.textContent = "⏳ Preparing Print...";
+    }
     try{
         const response = await fetch("/android-print", {cache:"no-store"});
         const result = await response.json();
-        if (!result.ok) {
-            alert("Print চালু করা যায়নি। Android Print Service চালু আছে কি না দেখুন.");
+        if (!response.ok || !result.ok || !result.token) {
+            throw new Error(result.error || "Print could not be started");
         }
+
+        const token = result.token;
+        for (let attempt = 0; attempt < 60; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            const statusResponse = await fetch(
+                "/android-print-status/" + encodeURIComponent(token),
+                {cache:"no-store"}
+            );
+            const status = await statusResponse.json();
+
+            if (status.done) {
+                if (status.ok) return;
+                if (status.cancelled) {
+                    alert("Print বাতিল করা হয়েছে।");
+                } else {
+                    alert("Print চালু করা যায়নি: " + (status.error || "Unknown error"));
+                }
+                return;
+            }
+        }
+        alert("Android Print Service-এর উত্তর পাওয়া যাচ্ছে না। কিছুক্ষণ পরে আবার চেষ্টা করুন.");
     }catch(e){
-        alert("Print চালু করা যায়নি।");
+        console.error("Native print error:", e);
+        alert("Print চালু করা যায়নি। Android Print Service চালু আছে কি না দেখুন.");
+    }finally{
+        if (button) {
+            button.disabled = false;
+            button.textContent = "🖨️ Print Report";
+        }
     }
 }
 </script>
