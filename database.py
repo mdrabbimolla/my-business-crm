@@ -170,6 +170,7 @@ def init_db():
     add_column_if_missing("leads", "visit_status", "TEXT DEFAULT 'Planned'")
     add_column_if_missing("leads", "visit_completed_date", "TEXT")
     add_column_if_missing("followups", "lead_id", "INTEGER")
+    add_column_if_missing("followups", "status", "TEXT DEFAULT 'New'")
 
     # Add user management columns if they do not exist.
     add_column_if_missing("users", "name", "TEXT")
