@@ -445,7 +445,7 @@ def get_update_info():
     try:
         api_url = "https://api.github.com/repos/mdrabbimolla/my-business-crm/releases/latest"
         req = urllib.request.Request(api_url, headers={"Accept": "application/vnd.github+json", "User-Agent": "My-Business-CRM"})
-        with urllib.request.urlopen(req, timeout=2.5) as response:
+        with urllib.request.urlopen(req, timeout=5, context=_https_context()) as response:
             release = json.loads(response.read().decode("utf-8"))
         tag = (release.get("tag_name") or "").lstrip("v")
         latest_version = tuple(int(p) for p in tag.split(".") if p.isdigit())
@@ -493,33 +493,15 @@ def login():
         """
 
     return """
-    <h1>My Business CRM</h1>
-
-    <form method="POST">
-
-        <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            required
-        >
-
-        <br><br>
-
-        <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            required
-        >
-
-        <br><br>
-
-        <button type="submit">
-            Login
-        </button>
-
-    </form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Business CRM</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Arial,sans-serif;background:linear-gradient(145deg,#07142f,#123b73);display:flex;align-items:center;justify-content:center;padding:24px;color:#172554}.login-wrap{width:100%;max-width:430px}.brand{text-align:center;color:#fff;margin-bottom:18px}.brand-icon{width:72px;height:72px;margin:0 auto 12px;border-radius:22px;background:linear-gradient(145deg,#f4d56b,#d4af37);display:flex;align-items:center;justify-content:center;font-size:38px;box-shadow:0 12px 30px rgba(0,0,0,.25)}.brand h1{margin:0;font-size:27px}.brand p{margin:7px 0 0;color:#dbeafe;font-size:13px}.login-card{background:rgba(255,255,255,.98);border-radius:24px;padding:26px;box-shadow:0 20px 60px rgba(0,0,0,.28)}.eyebrow{text-transform:uppercase;letter-spacing:1.5px;font-size:11px;color:#64748b;font-weight:800}.login-card h2{margin:6px 0 20px;font-size:23px}.field{margin-bottom:14px}.field label{display:block;font-size:13px;font-weight:700;margin-bottom:7px}.field input{width:100%;padding:14px;border:1px solid #cbd5e1;border-radius:12px;font-size:15px;outline:none}.field input:focus{border-color:#173b70;box-shadow:0 0 0 3px #dbeafe}.login-btn{width:100%;border:0;border-radius:12px;padding:14px;background:linear-gradient(135deg,#173b70,#2563a8);color:#fff;font-size:16px;font-weight:800;box-shadow:0 8px 18px rgba(23,59,112,.25)}.footer{text-align:center;color:#bfdbfe;font-size:11px;margin-top:16px}</style>
+</head><body><div class="login-wrap"><div class="brand"><div class="brand-icon">🏢</div><h1>My Business CRM</h1><p>Real Estate Sales & Customer Management</p></div><div class="login-card"><div class="eyebrow">Secure Access</div><h2>Welcome back 👋</h2><form method="POST"><div class="field"><label>Username</label><input type="text" name="username" placeholder="Enter username" autocomplete="username" required></div><div class="field"><label>Password</label><input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required></div><button class="login-btn" type="submit">🔐 Sign in to CRM</button></form></div><div class="footer">Professional • Fast • Organized</div></div></body></html>
     """
 
 @app.route("/android-call")
