@@ -12,15 +12,16 @@
             background: #f4f6f8;
             color: #172554;
         }
-        .header {
+         .header { position:relative; overflow:hidden; 
             background: linear-gradient(135deg, #172554, #173b70);
             color: white;
-            padding: 18px;
+            padding: 24px 18px 30px;
             border-bottom: 3px solid #d4af37;
+            box-shadow: 0 8px 25px rgba(23,59,112,.18);
         }
-        .header h1 { margin: 0; font-size: 23px; }
+        .header h1 { margin: 0; font-size: 25px; letter-spacing:.2px; }
         .container {
-            max-width: 900px;
+            max-width: 980px;
             margin: auto;
             padding: 18px;
         }
@@ -37,9 +38,14 @@
             text-decoration: none;
             color: inherit;
             box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-            border: 1px solid #eef1f5;
+            border: 1px solid #e7edf5;
+            transition: transform .16s ease, box-shadow .16s ease;
+            position:relative;
+            overflow:hidden;
         }
-        .card .icon { font-size: 28px; }
+        .card .icon { font-size: 31px; }
+        .card:after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,#173b70,#d4af37);opacity:.9}
+        .card:active{transform:scale(.985);box-shadow:0 7px 18px rgba(0,0,0,.12)}
         .card h3 {
             margin: 8px 0 5px;
             font-size: 14px;
@@ -105,6 +111,7 @@
 </div>
 
 <div class="container">
+    <div style="background:linear-gradient(135deg,#ffffff,#eef5ff);border:1px solid #dbe7f5;border-radius:18px;padding:15px 16px;margin-bottom:15px;box-shadow:0 5px 16px rgba(23,59,112,.06);"><div style="font-size:12px;font-weight:800;color:#64748b;text-transform:uppercase;letter-spacing:1px;">Sales Command Center</div><div style="font-size:19px;font-weight:900;color:#173b70;margin-top:4px;">Welcome, {{ session.get("username","User") }} 👋</div><div style="font-size:12px;color:#64748b;margin-top:4px;">Track leads, visits, follow-ups and projects from one place.</div></div>
 
     <div class="grid">
 
