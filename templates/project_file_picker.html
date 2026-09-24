@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="bn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Choose File</title>
+<style>body{font-family:Arial;background:#f1f5f9;color:#172554;text-align:center;padding:35px}.card{background:white;padding:25px;border-radius:14px;max-width:500px;margin:auto}</style>
+</head><body><div class="card"><h2>📂 Choose File</h2><p id="status">Android file picker খোলা হয়েছে। File select করে ফিরে আসুন...</p><a href="/project-files/{{ project_id }}" id="back" style="display:none">← Back to Project Files</a></div>
+<script>
+const token="{{ token }}";
+let timer=setInterval(async()=>{
+  try{
+    const r=await fetch("/android-project-file-status/"+token,{cache:"no-store"});
+    const s=await r.json();
+    if(s.done){
+      clearInterval(timer);
+      if(s.ok){ window.location.href="/project-files/"+s.project_id; }
+      else{
+        document.getElementById("status").textContent="⚠️ "+(s.error||"File select cancelled.");
+        document.getElementById("back").style.display="inline-block";
+      }
+    }
+  }catch(e){}
+},700);
+</script></body></html>
