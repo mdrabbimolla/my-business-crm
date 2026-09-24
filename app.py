@@ -3363,43 +3363,41 @@ _android_pdf_status = {}
 
 
 def save_android_pdf_file(file_path):
-    """Save a generated PDF directly into Downloads without opening a share chooser."""
+    """Publish a generated PDF to the public Downloads/My Business CRM/Reports folder."""
     if autoclass is None or cast is None or not os.path.exists(file_path):
-        return False
+        return False, "Android bridge or generated PDF file is unavailable"
+
+    uri = None
     try:
         ContentValues = autoclass("android.content.ContentValues")
-        MediaStoreFiles = autoclass("android.provider.MediaStore$Files")
+        MediaStoreDownloads = autoclass("android.provider.MediaStore$Downloads")
         Environment = autoclass("android.os.Environment")
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
+
         activity = cast("android.app.Activity", PythonActivity.mActivity)
         resolver = activity.getContentResolver()
+
         values = ContentValues()
-        values.put("_display_name", os.path.basename(file_path))
+        values.put("display_name", os.path.basename(file_path))
         values.put("mime_type", "application/pdf")
         values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Reports")
-        # Explicitly publish the MediaStore row at insert time. This avoids a second
-        # IS_PENDING update, which is rejected by some Android providers.\n        values.put("is_pending", 0)
-        # Android 10+ supports the public Downloads collection through
-        # MediaStore.  Do not use IS_PENDING here: some WebView/PyJNIus
-        # combinations accept the insert but never expose the resulting file.
-        downloads_uri = MediaStoreFiles.getContentUri("external")
-        try:
-            MediaStoreDownloads = autoclass("android.provider.MediaStore$Downloads")
-            downloads_uri = MediaStoreDownloads.getContentUri("external")
-        except Exception:
-            pass
+        # Follow Android's documented MediaStore flow:
+        # create as pending -> write -> publish by setting IS_PENDING to 0.
+        values.put("is_pending", 1)
 
+        downloads_uri = MediaStoreDownloads.getContentUri("external")
         uri = resolver.insert(downloads_uri, values)
         if uri is None:
-            return False
+            return False, "MediaStore could not create the Downloads entry"
+
+        pfd = resolver.openFileDescriptor(uri, "w", None)
+        if pfd is None:
+            raise RuntimeError("MediaStore could not open the PDF for writing")
+
         try:
-            stream = resolver.openOutputStream(uri)
-            if stream is None:
-                try:
-                    resolver.delete(uri, None, None)
-                except Exception:
-                    pass
-                return False
+            fd = pfd.getFileDescriptor()
+            FileOutputStream = autoclass("java.io.FileOutputStream")
+            stream = FileOutputStream(fd)
             try:
                 with open(file_path, "rb") as source:
                     while True:
@@ -3410,21 +3408,26 @@ def save_android_pdf_file(file_path):
                 stream.flush()
             finally:
                 stream.close()
+        finally:
+            pfd.close()
 
-            # The row was inserted without IS_PENDING, so do not update it here.
-            # Some Android MediaStore providers reject an IS_PENDING update on a
-            # completed Downloads row; that exception would otherwise delete the
-            # PDF we just wrote and report a false failure.
-            return True
-        except Exception:
+        publish_values = ContentValues()
+        publish_values.put("is_pending", 0)
+        updated = resolver.update(uri, publish_values, None, None)
+        if updated <= 0:
+            raise RuntimeError("MediaStore could not publish the PDF")
+
+        return True, "PDF published successfully"
+
+    except Exception as exc:
+        error = repr(exc)
+        print("PDF SAVE ERROR:", error)
+        if uri is not None:
             try:
                 resolver.delete(uri, None, None)
             except Exception:
                 pass
-            raise
-    except Exception as exc:
-        print("PDF SAVE ERROR:", repr(exc))
-        return False
+        return False, error
 
 def _pdf_draw_text(canvas, paint, text, x, y, max_chars=70, line_gap=14):
     text = str(text or "").replace("\\n", " ").strip()
@@ -3608,7 +3611,7 @@ def _create_daily_report_pdf(token, report):
             pdf.writeTo(output)
         pdf.close()
 
-        ok = save_android_pdf_file(path)
+        ok, save_message = save_android_pdf_file(path)
         if ok:
             _android_pdf_status[token] = {
                 "done": True,
@@ -3619,7 +3622,7 @@ def _create_daily_report_pdf(token, report):
             _android_pdf_status[token] = {
                 "done": True,
                 "ok": False,
-                "error": "PDF was created but could not be saved to phone storage"
+                "error": "PDF save failed: " + save_message
             }
     except Exception as exc:
         print("PDF REPORT ERROR:", repr(exc))
@@ -3728,10 +3731,9 @@ def daily_report_pdf():
     }
     _android_pdf_status[token] = {"done": False, "ok": True, "message": "Preparing PDF"}
     try:
-        if run_on_ui_thread is not None:
-            run_on_ui_thread(_create_daily_report_pdf)(token, _android_pdf_reports[token])
-        else:
-            _create_daily_report_pdf(token, _android_pdf_reports[token])
+        # PDF generation and MediaStore I/O do not require the Android UI thread.
+        # Running them directly avoids losing the job between Flask and the UI thread.
+        _create_daily_report_pdf(token, _android_pdf_reports[token])
         return {"ok": True, "token": token}
     except Exception as exc:
         _android_pdf_status[token] = {"done": True, "ok": False, "error": str(exc) or "PDF could not be started"}
