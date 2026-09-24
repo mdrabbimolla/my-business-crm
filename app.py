@@ -324,13 +324,13 @@ def _complete_project_file_picker(token, project_id, title, result_code, intent)
         print("PROJECT FILE PICKER ERROR:", exc)
         _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id, "error": "File could not be saved"}
     finally:
-        if android_activity is not None:
-            listener = _project_file_picker_listeners.pop(token, None)
-            if listener is not None:
-                try:
-                    android_activity.unbind(on_activity_result=listener)
-                except Exception:
-                    pass
+        listener = _project_file_picker_listeners.pop(token, None)
+        if listener is not None:
+            try:
+                PythonActivity = autoclass("org.kivy.android.PythonActivity")
+                PythonActivity.mActivity.unregisterActivityResultListener(listener)
+            except Exception:
+                pass
 
 def start_android_project_file_picker(project_id, title):
     if autoclass is None or android_activity is None:
@@ -362,7 +362,7 @@ def start_android_project_file_picker(project_id, title):
 
         listener = PickerListener()
         _project_file_picker_listeners[token] = listener
-        android_activity.bind(on_activity_result=listener)
+        activity.registerActivityResultListener(listener)
         activity.startActivityForResult(intent, PROJECT_FILE_PICKER_REQUEST)
         return token
     except Exception as exc:
