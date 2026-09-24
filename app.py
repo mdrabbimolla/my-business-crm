@@ -3274,8 +3274,20 @@ def _https_context():
 
 REMOTE_REPO = "mdrabbimolla/my-business-crm"
 REMOTE_BRANCH = "main"
-RUNTIME_TEMPLATE_DIR = os.path.join(os.path.expanduser("~"), ".mycrm_runtime", "templates")
-RUNTIME_VERSION_FILE = os.path.join(os.path.dirname(RUNTIME_TEMPLATE_DIR), "version.txt")
+def _runtime_root_dir():
+    # Android may expose HOME as /data, which is not writable by the app.
+    # Store runtime update files inside the app-private files directory instead.
+    if autoclass is not None:
+        try:
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            activity = cast("android.app.Activity", PythonActivity.mActivity)
+            return os.path.join(activity.getFilesDir().getAbsolutePath(), ".mycrm_runtime")
+        except Exception as exc:
+            print("ANDROID RUNTIME DIR ERROR:", repr(exc))
+    return os.path.join(os.path.expanduser("~"), ".mycrm_runtime")
+
+RUNTIME_TEMPLATE_DIR = os.path.join(_runtime_root_dir(), "templates")
+RUNTIME_VERSION_FILE = os.path.join(_runtime_root_dir(), "version.txt")
 
 
 def _remote_update_info():
@@ -3360,16 +3372,43 @@ def save_android_pdf_file(file_path):
         values.put("_display_name", os.path.basename(file_path))
         values.put("mime_type", "application/pdf")
         values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Reports")
-        uri = resolver.insert(MediaStoreFiles.getContentUri("external"), values)
+        try:
+            values.put("is_pending", 1)
+        except Exception:
+            pass
+
+        # Android 10+ provides a dedicated Downloads collection.
+        # RELATIVE_PATH lets the system place the file without legacy storage permission.
+        downloads_uri = MediaStoreFiles.getContentUri("external")
+        try:
+            MediaStoreDownloads = autoclass("android.provider.MediaStore$Downloads")
+            downloads_uri = MediaStoreDownloads.getContentUri("external")
+        except Exception:
+            pass
+
+        uri = resolver.insert(downloads_uri, values)
         if uri is None:
             return False
-        stream = resolver.openOutputStream(uri)
-        if stream is None:
-            return False
-        with open(file_path, "rb") as source:
-            stream.write(source.read())
-        stream.close()
-        return True
+        try:
+            stream = resolver.openOutputStream(uri)
+            if stream is None:
+                return False
+            with open(file_path, "rb") as source:
+                stream.write(source.read())
+            stream.close()
+            try:
+                done_values = ContentValues()
+                done_values.put("is_pending", 0)
+                resolver.update(uri, done_values, None, None)
+            except Exception:
+                pass
+            return True
+        except Exception:
+            try:
+                resolver.delete(uri, None, None)
+            except Exception:
+                pass
+            raise
     except Exception as exc:
         print("PDF SAVE ERROR:", repr(exc))
         return False
