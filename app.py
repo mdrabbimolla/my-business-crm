@@ -110,13 +110,8 @@ app = Flask(__name__)
 
 app.secret_key = "mycrm-secret-key"
 
-# Use the bundled templates immediately; a remote UI update is attempted in the background-safe startup path.
-try:
-    startup_update = _sync_remote_templates()
-    if startup_update.get("ok") and startup_update.get("updated"):
-        print("REMOTE UI UPDATE:", startup_update)
-except Exception as exc:
-    print("REMOTE UI STARTUP UPDATE ERROR:", repr(exc))
+# Use bundled templates at startup. Live UI updates are checked manually from the CRM menu.
+# Network update work is intentionally excluded from app startup so Android WebView opens immediately.
 
 
 init_db()
