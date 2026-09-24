@@ -17,23 +17,28 @@ input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;
 .stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}
 .stat b{display:block;font-size:23px;margin-top:5px}
 .table-wrap{overflow:auto}
-table{width:100%;border-collapse:collapse;min-width:900px}
+table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}
 th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left;vertical-align:top;font-size:13px}
-th{background:#f8fafc}
+th{background:#172554;color:white;font-size:12px;letter-spacing:.2px}
+tbody tr:nth-child(even){background:#f8fafc}
 .note{max-width:360px;white-space:pre-wrap}
 .small{font-size:12px;color:#64748b}
 .print-only{display:none}
 @media(max-width:600px){.filters,.stats{grid-template-columns:1fr}.container{padding:12px}}
+@page{size:A4 portrait;margin:10mm}
 @media print{
-    body{background:white;color:#000}
+    body{background:white;color:#0f172a}
     .no-print,.menu-button,.side-menu,.menu-overlay{display:none !important}
-    .header{background:white;color:#000;border-bottom:2px solid #000;padding:10px}
+    .header{background:#172554 !important;color:white !important;border-bottom:4px solid #d4af37;padding:14px 16px}
     .container{max-width:none;padding:0}
-    .card{box-shadow:none;border:1px solid #bbb;border-radius:0;margin:0 0 8px;padding:10px}
+    .card{box-shadow:none;border:1px solid #cbd5e1;border-radius:8px;margin:0 0 10px;padding:10px;break-inside:avoid}
     .print-only{display:block}
     .table-wrap{overflow:visible}
-    table{min-width:0;width:100%;font-size:10px}
-    th,td{font-size:10px;padding:6px}
+    table{min-width:0;width:100%;font-size:9px}
+    thead{display:table-header-group}
+    tr{break-inside:avoid}
+    th{font-size:9px;padding:7px;background:#172554 !important;color:white !important}
+    td{font-size:9px;padding:7px}
     .note{max-width:none}
 }
 </style>
@@ -68,10 +73,13 @@ th{background:#f8fafc}
 
 <div class="card">
 <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-<h3 style="margin:0">📋 Talked Leads</h3>
+<div>
+<h3 style="margin:0">📋 Talked Leads — Report Sheet</h3>
+<div class="small">Professional A4-ready sheet • Premium print/PDF layout</div>
+</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
-<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
-<button class="btn primary" type="button" onclick="savePdfReport()">💾 Save PDF Report</button>
+<button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Premium Sheet</button>
+<button class="btn primary" type="button" onclick="savePdfReport()">💾 Save Premium PDF</button>
 </div>
 </div>
 {% if talked_leads %}
@@ -115,7 +123,7 @@ async function savePdfReport(){
             const statusResponse = await fetch("/daily-report-pdf-status/" + encodeURIComponent(result.token), {cache:"no-store"});
             const status = await statusResponse.json();
             if (status.done) {
-                if (status.ok) { alert("✅ PDF saved to Downloads/My Business CRM/Reports"); return; }
+                if (status.ok) { alert("✅ Premium PDF saved to Downloads/My Business CRM/Reports"); return; }
                 throw new Error(status.error || "PDF could not be created");
             }
         }
@@ -124,7 +132,7 @@ async function savePdfReport(){
         console.error("PDF save error:", e);
         alert("PDF save করা যায়নি: " + e.message);
     } finally {
-        if (button) { button.disabled = false; button.textContent = "💾 Save PDF Report"; }
+        if (button) { button.disabled = false; button.textContent = "💾 Save Premium PDF"; }
     }
 }
 
@@ -136,22 +144,23 @@ async function startNativePrint(){
         const result = await response.json();
         if (!response.ok || !result.ok || !result.token) throw new Error(result.error || "Print could not be started");
         const token = result.token;
-        for (let attempt = 0; attempt < 60; attempt++) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            const statusResponse = await fetch("/android-print-status/" + encodeURIComponent(token), {cache:"no-store"});
-            const status = await statusResponse.json();
-            if (status.done) {
-                if (status.ok) return;
-                if (status.cancelled) { alert("Print বাতিল করা হয়েছে।"); return; }
-                alert("Print চালু করা যায়নি: " + (status.error || "Unknown error")); return;
-            }
+        await new Promise(resolve => setTimeout(resolve, 700));
+        const statusResponse = await fetch("/android-print-status/" + encodeURIComponent(token), {cache:"no-store"});
+        const status = await statusResponse.json();
+        if (status.ok) {
+            alert("🖨️ Premium print sheet প্রস্তুত। Android-এর Print screen থেকে printer নির্বাচন করুন।");
+            return;
         }
-        alert("Android Print Service-এর উত্তর পাওয়া যাচ্ছে না।");
+        if (status.cancelled) {
+            alert("Print বাতিল করা হয়েছে।");
+            return;
+        }
+        throw new Error(status.error || "Android Print Service could not accept the job");
     }catch(e){
         console.error("Native print error:", e);
         alert("Print চালু করা যায়নি: " + e.message);
     }finally{
-        if (button) { button.disabled = false; button.textContent = "🖨️ Print Full Sheet"; }
+        if (button) { button.disabled = false; button.textContent = "🖨️ Print Premium Sheet"; }
     }
 }
 </script>
