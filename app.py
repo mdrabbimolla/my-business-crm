@@ -246,11 +246,13 @@ def _reload_webview(url):
 _android_print_status = {}
 _android_print_jobs = {}
 _android_print_adapters = {}
+_android_print_webviews = {}
 
 
 def _cleanup_android_print(token):
     _android_print_jobs.pop(token, None)
     _android_print_adapters.pop(token, None)
+    _android_print_webviews.pop(token, None)
 
 
 def _android_print_current_page(token):
@@ -267,7 +269,8 @@ def _android_print_current_page(token):
             return
 
         PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
-        print_manager = activity.getSystemService("print")
+        Context = autoclass("android.content.Context")
+        print_manager = activity.getSystemService(Context.PRINT_SERVICE)
         if print_manager is None:
             _android_print_status[token] = {"done": True, "ok": False, "error": "Android PrintManager is unavailable"}
             return
@@ -278,10 +281,14 @@ def _android_print_current_page(token):
             return
 
         attributes = PrintAttributesBuilder().build()
-        # PrintManager.print() is asynchronous. Strong references are required.
+        # Android requires the WebView, adapter, and PrintJob to remain strongly referenced.
         print_job = print_manager.print(
             "My Business CRM - Daily Sales Report", adapter, attributes
         )
+        if print_job is None:
+            _android_print_status[token] = {"done": True, "ok": False, "error": "Android PrintManager did not create a print job"}
+            return
+        _android_print_webviews[token] = webview
         _android_print_adapters[token] = adapter
         _android_print_jobs[token] = print_job
         _android_print_status[token] = {"done": False, "ok": True, "message": "Print job submitted"}
