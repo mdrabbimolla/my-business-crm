@@ -441,7 +441,7 @@
                         </a>
 
 {% if current_role == "Admin" %}
-                        <form method="POST" action="/delete-lead/{{ lead['id'] }}" style="margin:0;" onsubmit="return confirm('এই lead টি delete করবেন?')">
+                        <form method="POST" action="/delete-lead/{{ lead['id'] }}" style="margin:0;">
                             <button type="submit" class="action-btn" style="width:100%;background:#fee2e2;color:#b91c1c;border-color:#fecaca;"><span><span class="action-icon">🗑️</span>Delete Lead</span></button>
                         </form>
 {% endif %}
