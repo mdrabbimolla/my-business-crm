@@ -295,7 +295,7 @@
    target="_blank">
     🧾 Receipt
 </a>
-<form method="POST" action="/delete-payment/{{ payment['id'] }}" style="display:inline;margin:0" onsubmit="return confirm('Are you sure you want to delete this payment?');"><button type="submit" style="border:0;background:none;color:#173b70;text-decoration:underline;padding:0;cursor:pointer;">🗑️ Delete</button></form>
+<form method="POST" action="/delete-payment/{{ payment['id'] }}" style="display:inline;margin:0"><button type="submit" style="border:0;background:none;color:#173b70;text-decoration:underline;padding:0;cursor:pointer;">🗑️ Delete</button></form>
                         {% if payment['note'] %}
                             <div class="payment-note">
                                 📝 {{ payment['note'] }}
