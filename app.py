@@ -3377,13 +3377,9 @@ def save_android_pdf_file(file_path):
         values.put("_display_name", os.path.basename(file_path))
         values.put("mime_type", "application/pdf")
         values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Reports")
-        try:
-            values.put("is_pending", 1)
-        except Exception:
-            pass
-
-        # Android 10+ provides a dedicated Downloads collection.
-        # RELATIVE_PATH lets the system place the file without legacy storage permission.
+        # Android 10+ supports the public Downloads collection through
+        # MediaStore.  Do not use IS_PENDING here: some WebView/PyJNIus
+        # combinations accept the insert but never expose the resulting file.
         downloads_uri = MediaStoreFiles.getContentUri("external")
         try:
             MediaStoreDownloads = autoclass("android.provider.MediaStore$Downloads")
