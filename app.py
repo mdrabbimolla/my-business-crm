@@ -3602,9 +3602,14 @@ def _create_daily_report_pdf(token, report):
         os.makedirs(out_dir, exist_ok=True)
         filename = "Daily_Report_" + report["date"] + ".pdf"
         path = os.path.join(out_dir, filename)
-        with open(path, "wb") as output:
+        FileOutputStream = autoclass("java.io.FileOutputStream")
+        output = FileOutputStream(path)
+        try:
             pdf.writeTo(output)
-        pdf.close()
+            output.flush()
+        finally:
+            output.close()
+            pdf.close()
 
         ok, save_message = save_android_pdf_file(path)
         if ok:
