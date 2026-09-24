@@ -154,19 +154,25 @@ def ensure_project_file_dir(project_id):
     os.makedirs(path, exist_ok=True)
     return path
 
+def _share_android_text_now(text_value):
+    Intent = autoclass("android.content.Intent")
+    PythonActivity = autoclass("org.kivy.android.PythonActivity")
+    activity = cast("android.app.Activity", PythonActivity.mActivity)
+    intent = Intent(Intent.ACTION_SEND)
+    intent.setType("text/plain")
+    intent.putExtra(Intent.EXTRA_TEXT, text_value or "")
+    chooser = Intent.createChooser(intent, "Send Daily Report")
+    activity.startActivity(chooser)
+    return True
+
 def share_android_text(text_value):
     if autoclass is None or cast is None:
         return False
     try:
-        Intent = autoclass("android.content.Intent")
-        PythonActivity = autoclass("org.kivy.android.PythonActivity")
-        activity = cast("android.app.Activity", PythonActivity.mActivity)
-        intent = Intent(Intent.ACTION_SEND)
-        intent.setType("text/plain")
-        intent.putExtra(Intent.EXTRA_TEXT, text_value or "")
-        intent.setPackage("com.whatsapp.w4b")
-        activity.startActivity(Intent.createChooser(intent, "Send Project Text"))
-        return True
+        if run_on_ui_thread is not None:
+            run_on_ui_thread(_share_android_text_now)(text_value)
+            return True
+        return _share_android_text_now(text_value)
     except Exception as exc:
         print("TEXT SHARE ERROR:", exc)
         return False
@@ -3633,6 +3639,20 @@ def _create_daily_report_pdf(token, report):
         }
     finally:
         _android_pdf_reports.pop(token, None)
+
+@app.route("/share-daily-report", methods=["POST"])
+def share_daily_report():
+    if not session.get("logged_in"):
+        return {"ok": False, "error": "Not logged in"}, 401
+    payload = request.get_json(silent=True) or {}
+    report_text = str(payload.get("text") or "").strip()
+    if not report_text:
+        return {"ok": False, "error": "Report text is empty"}, 400
+    if len(report_text) > 50000:
+        return {"ok": False, "error": "Report is too large to share"}, 400
+    if not share_android_text(report_text):
+        return {"ok": False, "error": "Android Share could not be opened"}, 500
+    return {"ok": True}
 
 @app.route("/daily-report-pdf")
 def daily_report_pdf():
