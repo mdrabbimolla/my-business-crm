@@ -71,7 +71,7 @@ th{background:#f8fafc}
 <h3 style="margin:0">📋 Talked Leads</h3>
 <div style="display:flex;gap:8px;flex-wrap:wrap" class="no-print">
 <button class="btn gold" type="button" onclick="startNativePrint()">🖨️ Print Full Sheet</button>
-<button class="btn primary" type="button" onclick="sendPdfReport()">📄 Send PDF Report</button>
+<button class="btn primary" type="button" onclick="savePdfReport()">💾 Save PDF Report</button>
 </div>
 </div>
 {% if talked_leads %}
@@ -101,7 +101,7 @@ th{background:#f8fafc}
 </div>
 </div>
 <script>
-async function sendPdfReport(){
+async function savePdfReport(){
     const button = document.querySelector('button[onclick="sendPdfReport()"]');
     if (button) { button.disabled = true; button.textContent = "⏳ Creating PDF..."; }
     try {
@@ -121,8 +121,8 @@ async function sendPdfReport(){
         }
         throw new Error("PDF creation is taking too long");
     } catch (e) {
-        console.error("PDF report error:", e);
-        alert("PDF তৈরি করা যায়নি: " + e.message);
+        console.error("PDF save error:", e);
+        alert("PDF save করা যায়নি: " + e.message);
     } finally {
         if (button) { button.disabled = false; button.textContent = "📄 Send PDF Report"; }
     }
