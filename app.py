@@ -9,6 +9,7 @@ import tempfile
 import zipfile
 import shutil
 import ssl
+import threading
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
 from database import get_db, init_db
@@ -167,15 +168,38 @@ def _share_android_text_now(text_value):
 
 def share_android_text(text_value):
     if autoclass is None or cast is None:
-        return False
+        return False, "Android bridge is unavailable"
+
+    result = {"ok": False, "error": "Android Share did not start"}
+    done = threading.Event()
+
+    def launch_share():
+        try:
+            _share_android_text_now(text_value)
+            result["ok"] = True
+            result["error"] = ""
+            print("TEXT SHARE: Android chooser started")
+        except Exception as exc:
+            result["ok"] = False
+            result["error"] = str(exc) or repr(exc)
+            print("TEXT SHARE ERROR:", repr(exc))
+        finally:
+            done.set()
+
     try:
         if run_on_ui_thread is not None:
-            run_on_ui_thread(_share_android_text_now)(text_value)
-            return True
-        return _share_android_text_now(text_value)
+            run_on_ui_thread(launch_share)()
+            if not done.wait(5):
+                return False, "Android Share timed out before it could be opened"
+        else:
+            launch_share()
+
+        if result["ok"]:
+            return True, ""
+        return False, result["error"] or "Android Share could not be opened"
     except Exception as exc:
-        print("TEXT SHARE ERROR:", exc)
-        return False
+        print("TEXT SHARE DISPATCH ERROR:", repr(exc))
+        return False, str(exc) or "Android Share could not be opened"
 
 def share_android_file(file_path, mime_type):
     if autoclass is None or cast is None or not os.path.exists(file_path):
@@ -3650,8 +3674,9 @@ def share_daily_report():
         return {"ok": False, "error": "Report text is empty"}, 400
     if len(report_text) > 50000:
         return {"ok": False, "error": "Report is too large to share"}, 400
-    if not share_android_text(report_text):
-        return {"ok": False, "error": "Android Share could not be opened"}, 500
+    ok, error = share_android_text(report_text)
+    if not ok:
+        return {"ok": False, "error": error or "Android Share could not be opened"}, 500
     return {"ok": True}
 
 @app.route("/daily-report-pdf")
