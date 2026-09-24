@@ -230,8 +230,6 @@ def _create_daily_report_pdf(token, report):
         PdfDocument = autoclass("android.graphics.pdf.PdfDocument")
         Paint = autoclass("android.graphics.Paint")
         Typeface = autoclass("android.graphics.Typeface")
-        Environment = autoclass("android.os.Environment")
-
         pdf = PdfDocument()
         page_width, page_height = 595, 842
         margin = 28
@@ -319,7 +317,7 @@ def _create_daily_report_pdf(token, report):
             canvas.drawLine(margin, y - 4, right, y - 4, body_paint)
 
         pdf.finishPage(page)
-        out_dir = os.path.join(Environment.getExternalStorageDirectory().getPath(), "Download", "My Business CRM", "Reports")
+        out_dir = os.path.join("/tmp", "mycrm_reports")
         os.makedirs(out_dir, exist_ok=True)
         filename = "Daily_Report_" + report["date"] + ".pdf"
         path = os.path.join(out_dir, filename)
