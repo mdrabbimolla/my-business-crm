@@ -241,55 +241,94 @@ def _reload_webview(url):
         print("WEBVIEW RELOAD ERROR:", exc)
         return False
 
-# Keep Android print objects alive until the system finishes with them.
-_android_print_jobs = []
-_android_print_adapters = []
+# Android print is asynchronous. Keep the adapter and PrintJob alive until
+# Android reports that the job has completed, failed, or was cancelled.
+_android_print_status = {}
+_android_print_jobs = {}
+_android_print_adapters = {}
 
 
-def _android_print_current_page():
-    """Run the complete WebView print operation on Android's UI thread."""
+def _cleanup_android_print(token):
+    _android_print_jobs.pop(token, None)
+    _android_print_adapters.pop(token, None)
+
+
+def _android_print_current_page(token):
     if autoclass is None or cast is None:
-        print("ANDROID PRINT ERROR: PyJNIus is unavailable")
-        return False
+        _android_print_status[token] = {"done": True, "ok": False, "error": "PyJNIus is unavailable"}
+        return
     try:
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
         activity = cast("android.app.Activity", PythonActivity.mActivity)
-
-        # WebView APIs must be called from the thread that created the WebView.
         root = activity.getWindow().getDecorView()
         webview = _find_webview(root)
         if webview is None:
-            print("ANDROID PRINT ERROR: WebView not found on UI thread")
-            return False
+            _android_print_status[token] = {"done": True, "ok": False, "error": "WebView not found"}
+            return
 
         PrintAttributesBuilder = autoclass("android.print.PrintAttributes$Builder")
         print_manager = activity.getSystemService("print")
         if print_manager is None:
-            print("ANDROID PRINT ERROR: PrintManager unavailable")
-            return False
+            _android_print_status[token] = {"done": True, "ok": False, "error": "Android PrintManager is unavailable"}
+            return
 
         adapter = webview.createPrintDocumentAdapter("My Business CRM - Daily Sales Report")
         if adapter is None:
-            print("ANDROID PRINT ERROR: PrintDocumentAdapter is null")
-            return False
+            _android_print_status[token] = {"done": True, "ok": False, "error": "PrintDocumentAdapter could not be created"}
+            return
 
         attributes = PrintAttributesBuilder().build()
-        print_manager.print("My Business CRM - Daily Sales Report", adapter, attributes)
+        # PrintManager.print() is asynchronous. Strong references are required.
+        print_job = print_manager.print(
+            "My Business CRM - Daily Sales Report", adapter, attributes
+        )
+        _android_print_adapters[token] = adapter
+        _android_print_jobs[token] = print_job
+        _android_print_status[token] = {"done": False, "ok": True, "message": "Print job submitted"}
         print("ANDROID PRINT: print job submitted successfully")
-        return True
     except Exception as exc:
         print("ANDROID PRINT ERROR:", repr(exc))
-        return False
+        _android_print_status[token] = {"done": True, "ok": False, "error": str(exc) or "Print could not be started"}
 
-# Dispatch the ENTIRE operation to Android's UI thread. This is important:
-# createPrintDocumentAdapter() itself is a WebView API and cannot safely be
-# created from the Flask request thread.
-if run_on_ui_thread is not None:
-    @run_on_ui_thread
-    def _android_print_current_page_ui():
-        return _android_print_current_page()
-else:
-    _android_print_current_page_ui = _android_print_current_page
+
+def _android_print_current_page_ui(token):
+    if run_on_ui_thread is not None:
+        run_on_ui_thread(_android_print_current_page)(token)
+    else:
+        _android_print_current_page(token)
+
+
+def _android_print_job_status(token):
+    status = _android_print_status.get(token)
+    if not status:
+        return {"done": True, "ok": False, "error": "Print session not found"}
+    if status.get("done"):
+        return status
+
+    job = _android_print_jobs.get(token)
+    if job is None:
+        return {"done": True, "ok": False, "error": "Android PrintJob was lost"}
+
+    try:
+        if job.isCompleted():
+            result = {"done": True, "ok": True, "message": "Print job completed"}
+            _android_print_status[token] = result
+            _cleanup_android_print(token)
+            return result
+        if job.isFailed():
+            result = {"done": True, "ok": False, "error": "Android Print Service reported a print failure"}
+            _android_print_status[token] = result
+            _cleanup_android_print(token)
+            return result
+        if job.isCancelled():
+            result = {"done": True, "ok": False, "cancelled": True, "error": "Print job was cancelled"}
+            _android_print_status[token] = result
+            _cleanup_android_print(token)
+            return result
+        return {"done": False, "ok": True, "message": "Print job is still processing"}
+    except Exception as exc:
+        print("ANDROID PRINT STATUS ERROR:", repr(exc))
+        return {"done": False, "ok": True, "message": "Waiting for Android Print Service"}
 
 def _complete_project_file_picker(token, project_id, title, result_code, intent):
     try:
@@ -1137,12 +1176,22 @@ def delete_project(project_id):
 def android_print():
     if not session.get("logged_in"):
         return {"ok": False, "error": "Not logged in"}, 401
+    token = uuid.uuid4().hex
+    _android_print_status[token] = {"done": False, "ok": True, "message": "Starting Android Print Service"}
     try:
-        _android_print_current_page_ui()
-        return {"ok": True}
+        _android_print_current_page_ui(token)
+        return {"ok": True, "done": False, "token": token}
     except Exception as exc:
         print("PRINT UI THREAD ERROR:", repr(exc))
+        _android_print_status[token] = {"done": True, "ok": False, "error": str(exc) or "Print could not be started"}
         return {"ok": False, "error": "Print could not be started"}, 500
+
+
+@app.route("/android-print-status/<token>")
+def android_print_status(token):
+    if not session.get("logged_in"):
+        return {"done": True, "ok": False, "error": "Not logged in"}, 401
+    return _android_print_job_status(token)
 
 @app.route("/android-pick-project-file/<int:project_id>")
 def android_pick_project_file(project_id):
