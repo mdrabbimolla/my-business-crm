@@ -49,33 +49,7 @@ jobs:
       - name: Prepare CRM
         run: |
           test -f app.py
-
-          # ROOT-CAUSE FIX:
-          # Android PdfDocument.writeTo() requires a Java OutputStream.
-          # Python's built-in file object is not a Java OutputStream.
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("app.py")
-          s = p.read_text(encoding="utf-8")
-          old = '''        with open(path, "wb") as output:
-            pdf.writeTo(output)
-        pdf.close()
-'''
-          new = '''        FileOutputStream = autoclass("java.io.FileOutputStream")
-        output = FileOutputStream(path)
-        try:
-            pdf.writeTo(output)
-            output.flush()
-        finally:
-            output.close()
-            pdf.close()
-'''
-          if old not in s:
-              raise SystemExit("Expected PDF write block was not found; refusing to build an unverified PDF patch.")
-          p.write_text(s.replace(old, new, 1), encoding="utf-8")
-          print("PDF ROOT-CAUSE FIX APPLIED: java.io.FileOutputStream")
-          PY
-
+          python3 -c 'from pathlib import Path; p=Path("app.py"); s=p.read_text(encoding="utf-8"); old="        with open(path, \\"wb\\") as output:\\n            pdf.writeTo(output)\\n        pdf.close()\\n"; new="        FileOutputStream = autoclass(\\"java.io.FileOutputStream\\")\\n        output = FileOutputStream(path)\\n        try:\\n            pdf.writeTo(output)\\n            output.flush()\\n        finally:\\n            output.close()\\n            pdf.close()\\n"; assert old in s, "Expected PDF write block was not found"; p.write_text(s.replace(old,new,1), encoding="utf-8"); print("PDF ROOT-CAUSE FIX APPLIED: java.io.FileOutputStream")'
           cp app.py main.py
           test -s main.py
           mkdir -p apk-output
