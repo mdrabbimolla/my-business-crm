@@ -83,6 +83,71 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(leads_phone2.status_code, 200)
         self.assertEqual(leads_phone2.json["leads"], [])
 
+    def test_lead_filters_and_display_fields(self):
+        for username, name in (("filter-admin", "Filter Admin"), ("filter-sales", "Filter Sales")):
+            response = self.client.post(
+                "/api/bootstrap-user",
+                json={"username": username, "password": "pass-123", "name": name,
+                      "role": "Admin" if "admin" in username else "Sales"},
+                headers={"X-CRM-API-SECRET": "test-secret"},
+            )
+            self.assertEqual(response.status_code, 201)
+
+        admin_login = self.client.post("/api/login", json={"username":"filter-admin","password":"pass-123"})
+        sales_login = self.client.post("/api/login", json={"username":"filter-sales","password":"pass-123"})
+        admin_token = admin_login.json["token"]
+        sales_token = sales_login.json["token"]
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+        project = self.client.post(
+            "/api/projects", json={"name":"Filter Project"},
+            headers=admin_headers,
+        )
+        self.assertEqual(project.status_code, 201)
+        project_id = project.json["project"]["id"]
+
+        lead = self.client.post(
+            "/api/leads",
+            json={"name":"Unique Filter Person","phone":"01900000011",
+                  "project_id":project_id, "assigned_to":"filter-sales"},
+            headers=admin_headers,
+        )
+        self.assertEqual(lead.status_code, 201)
+        lead_id = lead.json["lead"]["id"]
+
+        note = self.client.post(
+            f"/api/leads/{lead_id}/notes",
+            json={"note":"Latest central note","note_date":"2026-09-25"},
+            headers={"Authorization": f"Bearer {sales_token}"},
+        )
+        self.assertEqual(note.status_code, 201)
+
+        response = self.client.get(
+            "/api/leads?search=Unique%20Filter&project_id=" + str(project_id),
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json["leads"]), 1)
+        item = response.json["leads"][0]
+        self.assertEqual(item["project_name"], "Filter Project")
+        self.assertEqual(item["assigned_user_name"], "Filter Sales")
+        self.assertEqual(item["latest_note"], "Latest central note")
+        self.assertEqual(item["latest_note_date"], "2026-09-25")
+
+        sales_response = self.client.get(
+            "/api/leads?search=Unique%20Filter",
+            headers={"Authorization": f"Bearer {sales_token}"},
+        )
+        self.assertEqual(sales_response.status_code, 200)
+        self.assertEqual(len(sales_response.json["leads"]), 1)
+
+        empty_response = self.client.get(
+            "/api/leads?search=Unique%20Filter&project_id=999999",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        self.assertEqual(empty_response.status_code, 200)
+        self.assertEqual(empty_response.json["leads"], [])
+
     def test_duplicate_phone_is_blocked(self):
         self.client.post("/api/bootstrap-user",
             json={"username":"dup-user","password":"pass-123","name":"Duplicate Test","role":"Sales"},
