@@ -73,6 +73,11 @@ def init_cloud_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL NOT NULL, expense_date TEXT,
         category TEXT, note TEXT, created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS receipt_settings (
+        id INTEGER PRIMARY KEY,
+        header_name TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS project_files (
         id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL,
         title TEXT NOT NULL, item_type TEXT NOT NULL, file_name TEXT,
@@ -119,6 +124,43 @@ def require_token(fn):
 def health():
     init_cloud_db()
     return jsonify(ok=True, service="my-business-crm-central-api")
+
+@app.get("/api/receipt-settings")
+@require_token
+def get_receipt_settings():
+    init_cloud_db()
+    conn = db()
+    row = conn.execute("SELECT * FROM receipt_settings WHERE id=1").fetchone()
+    if not row:
+        conn.execute("INSERT INTO receipt_settings(id,header_name,updated_at) VALUES(1,?,?)",
+                     ("ARKAM MC PARK", datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        row = conn.execute("SELECT * FROM receipt_settings WHERE id=1").fetchone()
+    conn.close()
+    return jsonify(settings=dict(row))
+
+
+@app.put("/api/receipt-settings")
+@require_token
+def update_receipt_settings():
+    data = request.get_json(silent=True) or {}
+    header_name = (data.get("header_name") or "").strip()
+    if not header_name:
+        return jsonify(error="header_name is required"), 400
+    if len(header_name) > 120:
+        return jsonify(error="header_name is too long"), 400
+    if g.user["role"] not in {"Admin", "Manager"}:
+        return jsonify(error="Admin or Manager access required"), 403
+    init_cloud_db()
+    conn = db()
+    conn.execute("INSERT INTO receipt_settings(id,header_name,updated_at) VALUES(1,?,?) "
+                 "ON CONFLICT(id) DO UPDATE SET header_name=excluded.header_name, updated_at=excluded.updated_at",
+                 (header_name, datetime.now(timezone.utc).isoformat()))
+    conn.commit()
+    row = conn.execute("SELECT * FROM receipt_settings WHERE id=1").fetchone()
+    conn.close()
+    return jsonify(settings=dict(row))
+
 
 @app.post("/api/bootstrap-user")
 @require_api_secret
