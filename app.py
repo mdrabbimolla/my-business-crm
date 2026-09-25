@@ -135,7 +135,21 @@ def clean_phone(phone):
 
 
 
-PROJECT_FILE_ROOT = os.path.join(os.getcwd(), "project_files")
+def _app_private_storage_root():
+    """Return writable app-private storage on Android, with a desktop fallback."""
+    try:
+        if autoclass is not None:
+            PythonActivity = autoclass("org.kivy.android.PythonActivity")
+            activity = PythonActivity.mActivity
+            files_dir = activity.getFilesDir().getAbsolutePath()
+            os.makedirs(files_dir, exist_ok=True)
+            return files_dir
+    except Exception as exc:
+        print("APP STORAGE PATH ERROR:", exc)
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+PROJECT_FILE_ROOT = os.path.join(_app_private_storage_root(), "project_files")
 ALLOWED_PROJECT_FILE_EXTENSIONS = {"txt", "pdf", "jpg", "jpeg", "png"}
 
 def project_file_extension(filename):
