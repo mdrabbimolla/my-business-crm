@@ -24,7 +24,10 @@ jobs:
 
       - name: Compile CRM Python files
         run: |
-          python -m py_compile app.py cloud_client.py cloud_api.py central_api_core.py
+          python -m py_compile app.py cloud_client.py cloud_api.py central_api_core.py wsgi.py
 
       - name: Run central API tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Validate production Docker image
+        run: docker build -t my-business-crm-api:test .
