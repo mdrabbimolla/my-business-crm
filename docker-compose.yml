@@ -1,0 +1,14 @@
+services:
+  crm-api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      CRM_API_SECRET: ${CRM_API_SECRET:?Set CRM_API_SECRET before starting}
+      CRM_CLOUD_DB: /app/data/cloud.db
+    volumes:
+      - crm-data:/app/data
+
+volumes:
+  crm-data:
