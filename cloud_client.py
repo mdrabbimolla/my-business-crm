@@ -119,6 +119,9 @@ class CloudCRMClient:
     def create_followup(self, data):
         return self._request("POST", "/api/followups", data)
 
+    def get_followup(self, followup_id):
+        return self._request("GET", f"/api/followups/{int(followup_id)}")
+
     def update_followup(self, followup_id, data):
         return self._request("PUT", f"/api/followups/{int(followup_id)}", data)
 
