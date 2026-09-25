@@ -87,6 +87,22 @@ class CloudCRMClient:
     def me(self):
         return self._request("GET", "/api/me")
 
+    def users(self):
+        return self._request("GET", "/api/users").get("users", [])
+
+    def create_user(self, data):
+        return self._request("POST", "/api/users", data)
+
+    def reset_user_password(self, user_id, password):
+        return self._request("PUT", f"/api/users/{int(user_id)}/password", {"password": password})
+
+    def change_my_password(self, current_password, new_password):
+        return self._request(
+            "PUT",
+            "/api/me/password",
+            {"current_password": current_password, "new_password": new_password},
+        )
+
     def projects(self):
         return self._request("GET", "/api/projects").get("projects", [])
 
