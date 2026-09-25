@@ -84,7 +84,11 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(leads_phone2.json["leads"], [])
 
     def test_duplicate_phone_is_blocked(self):
-        login = self.client.post("/api/login", json={"username":"sales2","password":"pass-123"})
+        self.client.post("/api/bootstrap-user",
+            json={"username":"dup-user","password":"pass-123","name":"Duplicate Test","role":"Sales"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        login = self.client.post("/api/login", json={"username":"dup-user","password":"pass-123"})
+        self.assertEqual(login.status_code, 200)
         token = login.json["token"]
         first = self.client.post(
             "/api/leads", json={"name":"Phone Owner","phone":"01700000002"},
