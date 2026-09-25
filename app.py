@@ -2074,131 +2074,104 @@ def delete_followup(followup_id):
 
 @app.route("/add-expense", methods=["GET", "POST"])
 def add_expense():
-
     if not session.get("logged_in"):
         return redirect("/")
-
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        if request.method == "POST":
+            try:
+                cloud.create_expense({
+                    "amount": request.form.get("amount"),
+                    "expense_date": request.form.get("expense_date"),
+                    "category": request.form.get("category"),
+                    "note": request.form.get("note")
+                })
+            except CloudAPIError as exc:
+                return "Central CRM error: " + str(exc)
+            return redirect("/expenses")
+        return render_template("add_expense.html")
     if request.method == "POST":
-
-        amount = request.form.get("amount")
-        expense_date = request.form.get("expense_date")
-        category = request.form.get("category")
-        note = request.form.get("note")
-
-        conn = get_db()
-
-        conn.execute("""
-            INSERT INTO expenses
-            (amount, expense_date, category, note)
-            VALUES (?, ?, ?, ?)
-        """, (
-            amount,
-            expense_date,
-            category,
-            note
-        ))
-
-        conn.commit()
-        conn.close()
-
+        conn=get_db()
+        conn.execute("""INSERT INTO expenses(amount,expense_date,category,note) VALUES(?,?,?,?)""",
+                     (request.form.get("amount"),request.form.get("expense_date"),
+                      request.form.get("category"),request.form.get("note")))
+        conn.commit(); conn.close()
         return redirect("/expenses")
-
     return render_template("add_expense.html")
+
+
 @app.route("/expenses")
 def expenses():
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    conn = get_db()
-
-    expenses = conn.execute("""
-        SELECT *
-        FROM expenses
-        ORDER BY expense_date DESC, id DESC
-    """).fetchall()
-
-    total_expenses = conn.execute("""
-        SELECT COALESCE(SUM(amount), 0)
-        FROM expenses
-    """).fetchone()[0]
-
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            payload=cloud.expenses()
+            return render_template("expenses.html",
+                                   expenses=payload.get("expenses",[]),
+                                   total_expenses=payload.get("total_expenses",0))
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db()
+    rows=conn.execute("SELECT * FROM expenses ORDER BY expense_date DESC,id DESC").fetchall()
+    total=conn.execute("SELECT COALESCE(SUM(amount),0) FROM expenses").fetchone()[0]
     conn.close()
+    return render_template("expenses.html",expenses=rows,total_expenses=total)
 
-    return render_template(
-        "expenses.html",
-        expenses=expenses,
-        total_expenses=total_expenses
-    )
+
 @app.route("/edit-expense/<int:expense_id>", methods=["GET", "POST"])
 def edit_expense(expense_id):
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    conn = get_db()
-
-    expense = conn.execute(
-        "SELECT * FROM expenses WHERE id = ?",
-        (expense_id,)
-    ).fetchone()
-
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            expense=cloud._request("GET", f"/api/expenses/{int(expense_id)}").get("expense")
+            if not expense:
+                return "Expense not found"
+            if request.method == "POST":
+                cloud.update_expense(expense_id,{
+                    "amount":request.form.get("amount"),
+                    "expense_date":request.form.get("expense_date"),
+                    "category":request.form.get("category"),
+                    "note":request.form.get("note")
+                })
+                return redirect("/expenses")
+            return render_template("edit_expense.html",expense=expense)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db()
+    expense=conn.execute("SELECT * FROM expenses WHERE id=?",(expense_id,)).fetchone()
     if not expense:
-        conn.close()
-        return "Expense not found"
-
-    if request.method == "POST":
-
-        amount = request.form.get("amount")
-        expense_date = request.form.get("expense_date")
-        category = request.form.get("category")
-        note = request.form.get("note")
-
-        conn.execute("""
-            UPDATE expenses
-            SET amount = ?,
-                expense_date = ?,
-                category = ?,
-                note = ?
-            WHERE id = ?
-        """, (
-            amount,
-            expense_date,
-            category,
-            note,
-            expense_id
-        ))
-
-        conn.commit()
-        conn.close()
-
+        conn.close(); return "Expense not found"
+    if request.method=="POST":
+        conn.execute("""UPDATE expenses SET amount=?,expense_date=?,category=?,note=? WHERE id=?""",
+                     (request.form.get("amount"),request.form.get("expense_date"),
+                      request.form.get("category"),request.form.get("note"),expense_id))
+        conn.commit(); conn.close()
         return redirect("/expenses")
-
     conn.close()
-
-    return render_template(
-        "edit_expense.html",
-        expense=expense
-    )
+    return render_template("edit_expense.html",expense=expense)
 
 
 @app.route("/delete-expense/<int:expense_id>", methods=["GET", "POST"])
 def delete_expense(expense_id):
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    conn = get_db()
-
-    conn.execute(
-        "DELETE FROM expenses WHERE id = ?",
-        (expense_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            cloud.delete_expense(expense_id)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return redirect("/expenses")
+    conn=get_db()
+    conn.execute("DELETE FROM expenses WHERE id=?",(expense_id,))
+    conn.commit(); conn.close()
     return redirect("/expenses")
+
+
 def save_lead_note(conn, lead_id, note):
     note = (note or "").strip()
     if not note:
