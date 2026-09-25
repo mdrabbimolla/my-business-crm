@@ -321,6 +321,39 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(lead_after.status_code, 200)
         self.assertIsNone(lead_after.json["lead"]["follow_up_date"])
 
+    def test_expense_crud_is_central(self):
+        response=self.client.post("/api/bootstrap-user",
+            json={"username":"expense-admin","password":"pass-123","name":"Expense Admin","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        self.assertEqual(response.status_code,201)
+        login=self.client.post("/api/login",json={"username":"expense-admin","password":"pass-123"})
+        headers={"Authorization":f"Bearer {login.json['token']}"}
+
+        created=self.client.post("/api/expenses",json={
+            "amount":5000,"expense_date":"2026-09-25","category":"Office","note":"Test expense"
+        },headers=headers)
+        self.assertEqual(created.status_code,201)
+        expense_id=created.json["expense"]["id"]
+
+        detail=self.client.get(f"/api/expenses/{expense_id}",headers=headers)
+        self.assertEqual(detail.status_code,200)
+        self.assertEqual(detail.json["expense"]["category"],"Office")
+
+        updated=self.client.put(f"/api/expenses/{expense_id}",json={
+            "amount":7500,"expense_date":"2026-09-26","category":"Transport","note":"Updated"
+        },headers=headers)
+        self.assertEqual(updated.status_code,200)
+        self.assertEqual(updated.json["expense"]["amount"],7500)
+
+        listing=self.client.get("/api/expenses",headers=headers)
+        self.assertEqual(listing.status_code,200)
+        self.assertEqual(listing.json["total_expenses"],7500)
+
+        deleted=self.client.delete(f"/api/expenses/{expense_id}",headers=headers)
+        self.assertEqual(deleted.status_code,200)
+        self.assertEqual(self.client.get(f"/api/expenses/{expense_id}",headers=headers).status_code,404)
+        self.assertEqual(self.client.get("/api/expenses",headers=headers).json["total_expenses"],0)
+
     def test_core_unauthorized_access_is_blocked(self):
         self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
         self.assertEqual(self.client.get("/api/expenses").status_code, 401)
