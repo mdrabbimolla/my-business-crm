@@ -137,7 +137,9 @@ def register_core_routes(app, db, require_token):
     @api.get("/api/customers/<int:customer_id>")
     @require_token
     def get_customer(customer_id):
-        conn=db(); row=conn.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+        conn=db(); row=conn.execute("""SELECT customers.*, projects.name AS project_name
+                                       FROM customers LEFT JOIN projects ON projects.id=customers.project_id
+                                       WHERE customers.id=?""", (customer_id,)).fetchone()
         if not row: conn.close(); return jsonify(error="customer not found"),404
         payments=conn.execute("SELECT * FROM payments WHERE customer_id=? ORDER BY id DESC",(customer_id,)).fetchall()
         conn.close(); out=dict(row); out["due"]=(row["sales"] or 0)-(row["paid"] or 0); out["payments"]=[dict(x) for x in payments]
@@ -150,12 +152,48 @@ def register_core_routes(app, db, require_token):
         if not name: return jsonify(error="name is required"),400
         conn=db(); dup=duplicate_phone(conn,phone)
         if dup: conn.close(); return jsonify(error="phone number already exists",duplicate=dup),409
-        cur=conn.execute("""INSERT INTO customers(name,phone,address,business,notes,follow_up,sales,paid,project_id,created_at)
-                            VALUES(?,?,?,?,?,?,?,?,?,?)""",
-                         (name,phone,data.get("address"),data.get("business"),data.get("notes"),data.get("follow_up"),
-                          float(data.get("sales") or 0),float(data.get("paid") or 0),data.get("project_id"),now()))
-        conn.commit(); out=conn.execute("SELECT * FROM customers WHERE id=?", (cur.lastrowid,)).fetchone(); conn.close()
-        return jsonify(customer=dict(out)),201
+        try:
+            cur=conn.execute("""INSERT INTO customers(name,phone,address,business,notes,follow_up,sales,paid,project_id,created_at)
+                                VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                             (name,phone,data.get("address"),data.get("business"),data.get("notes"),data.get("follow_up"),
+                              float(data.get("sales") or 0),float(data.get("paid") or 0),data.get("project_id"),now()))
+            conn.commit(); out=conn.execute("SELECT * FROM customers WHERE id=?", (cur.lastrowid,)).fetchone()
+            return jsonify(customer=dict(out)),201
+        except (ValueError, sqlite3.IntegrityError) as exc:
+            conn.rollback()
+            return jsonify(error="customer could not be created"),400
+        finally: conn.close()
+
+    @api.put("/api/customers/<int:customer_id>")
+    @require_token
+    def update_customer(customer_id):
+        data=request.get_json(silent=True) or {}; conn=db()
+        row=conn.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+        if not row: conn.close(); return jsonify(error="customer not found"),404
+        phone=(data.get("phone",row["phone"]) or "").strip()
+        dup=duplicate_phone(conn,phone,customer_id=customer_id)
+        if dup: conn.close(); return jsonify(error="phone number already exists",duplicate=dup),409
+        try:
+            conn.execute("""UPDATE customers SET name=?,phone=?,address=?,business=?,notes=?,follow_up=?,
+                            sales=?,paid=?,project_id=? WHERE id=?""",
+                         ((data.get("name",row["name"]) or "").strip(),phone,
+                          data.get("address",row["address"]),data.get("business",row["business"]),
+                          data.get("notes",row["notes"]),data.get("follow_up",row["follow_up"]),
+                          float(data.get("sales",row["sales"]) or 0),float(data.get("paid",row["paid"]) or 0),
+                          data.get("project_id",row["project_id"]),customer_id))
+            conn.commit(); out=conn.execute("SELECT * FROM customers WHERE id=?", (customer_id,)).fetchone()
+            return jsonify(customer=dict(out))
+        except ValueError:
+            conn.rollback(); return jsonify(error="invalid customer data"),400
+        finally: conn.close()
+
+    @api.delete("/api/customers/<int:customer_id>")
+    @require_token
+    def delete_customer(customer_id):
+        conn=db(); row=conn.execute("SELECT id FROM customers WHERE id=?", (customer_id,)).fetchone()
+        if not row: conn.close(); return jsonify(error="customer not found"),404
+        conn.execute("DELETE FROM customers WHERE id=?", (customer_id,)); conn.commit(); conn.close()
+        return jsonify(deleted=True)
 
     @api.post("/api/customers/<int:customer_id>/payments")
     @require_token
@@ -169,6 +207,34 @@ def register_core_routes(app, db, require_token):
         conn.execute("UPDATE customers SET paid=COALESCE(paid,0)+? WHERE id=?",(amount,customer_id))
         conn.commit(); out=conn.execute("SELECT * FROM payments WHERE id=?", (cur.lastrowid,)).fetchone(); conn.close()
         return jsonify(payment=dict(out)),201
+
+    @api.put("/api/payments/<int:payment_id>")
+    @require_token
+    def update_payment(payment_id):
+        data=request.get_json(silent=True) or {}; conn=db()
+        row=conn.execute("SELECT * FROM payments WHERE id=?", (payment_id,)).fetchone()
+        if not row: conn.close(); return jsonify(error="payment not found"),404
+        try:
+            amount=float(data.get("amount",row["amount"]) or 0)
+            if amount<=0: conn.close(); return jsonify(error="payment amount must be greater than zero"),400
+            diff=amount-float(row["amount"] or 0)
+            conn.execute("UPDATE payments SET amount=?,payment_date=?,note=? WHERE id=?",
+                         (amount,data.get("payment_date",row["payment_date"]),data.get("note",row["note"]),payment_id))
+            conn.execute("UPDATE customers SET paid=COALESCE(paid,0)+? WHERE id=?",(diff,row["customer_id"]))
+            conn.commit(); out=conn.execute("SELECT * FROM payments WHERE id=?", (payment_id,)).fetchone()
+            return jsonify(payment=dict(out))
+        except ValueError:
+            conn.rollback(); return jsonify(error="invalid payment data"),400
+        finally: conn.close()
+
+    @api.delete("/api/payments/<int:payment_id>")
+    @require_token
+    def delete_payment(payment_id):
+        conn=db(); row=conn.execute("SELECT * FROM payments WHERE id=?", (payment_id,)).fetchone()
+        if not row: conn.close(); return jsonify(error="payment not found"),404
+        conn.execute("DELETE FROM payments WHERE id=?", (payment_id,))
+        conn.execute("UPDATE customers SET paid=COALESCE(paid,0)-? WHERE id=?",(row["amount"],row["customer_id"]))
+        conn.commit(); conn.close(); return jsonify(deleted=True)
 
     @api.get("/api/expenses")
     @require_token
