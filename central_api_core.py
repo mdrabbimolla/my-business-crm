@@ -114,6 +114,22 @@ def register_core_routes(app, db, require_token):
             rows=conn.execute("SELECT * FROM followups ORDER BY follow_up_date ASC,id DESC").fetchall()
         conn.close(); return jsonify(followups=[dict(x) for x in rows])
 
+    @api.get("/api/followups/<int:followup_id>")
+    @require_token
+    def get_followup(followup_id):
+        conn=db()
+        row=conn.execute("SELECT * FROM followups WHERE id=?", (followup_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="follow-up not found"),404
+        if g.user["role"]=="Sales" and row["lead_id"]:
+            lead=conn.execute("SELECT assigned_to FROM leads WHERE id=?", (row["lead_id"],)).fetchone()
+            if not lead or lead["assigned_to"] != g.user["username"]:
+                conn.close()
+                return jsonify(error="access denied"),403
+        conn.close()
+        return jsonify(followup=dict(row))
+
     @api.put("/api/followups/<int:followup_id>")
     @require_token
     def update_followup(followup_id):
