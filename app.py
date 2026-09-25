@@ -878,66 +878,37 @@ def dashboard():
     if not session.get("logged_in"):
         return redirect("/")
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            metrics = cloud.dashboard()
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        update_info = get_update_info()
+        return render_template(
+            "dashboard.html",
+            **metrics,
+            app_version=APP_VERSION,
+            update_info=update_info
+        )
+
     conn = get_db()
-
-    total_customers = conn.execute(
-        "SELECT COUNT(*) FROM customers"
-    ).fetchone()[0]
-
-    total_sales = conn.execute(
-        "SELECT COALESCE(SUM(sales), 0) FROM customers"
-    ).fetchone()[0]
-
+    total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+    total_sales = conn.execute("SELECT COALESCE(SUM(sales), 0) FROM customers").fetchone()[0]
     today = date.today().isoformat()
-
-    today_followups = conn.execute(
-        "SELECT * FROM followups WHERE follow_up_date = ? ORDER BY id DESC",
-        (today,)
-    ).fetchall()
-
+    today_followups = conn.execute("SELECT * FROM followups WHERE follow_up_date = ? ORDER BY id DESC", (today,)).fetchall()
     today_followup_count = len(today_followups)
-
-    missed_followup_count = conn.execute("""
-        SELECT COUNT(*)
-        FROM followups
-        WHERE follow_up_date < ?
-    """, (today,)).fetchone()[0]
-
-    upcoming_followup_count = conn.execute("""
-        SELECT COUNT(*)
-        FROM followups
-        WHERE follow_up_date > ?
-    """, (today,)).fetchone()[0]
-
-    visit_count = conn.execute("""
-        SELECT COUNT(*)
-        FROM leads
-        WHERE visit_date IS NOT NULL
-        AND TRIM(visit_date) != ''
-    """).fetchone()[0]
-
-    cancel_count = conn.execute(
-        "SELECT COUNT(*) FROM canceled_leads"
-    ).fetchone()[0]
-
+    missed_followup_count = conn.execute("SELECT COUNT(*) FROM followups WHERE follow_up_date < ?", (today,)).fetchone()[0]
+    upcoming_followup_count = conn.execute("SELECT COUNT(*) FROM followups WHERE follow_up_date > ?", (today,)).fetchone()[0]
+    visit_count = conn.execute("SELECT COUNT(*) FROM leads WHERE visit_date IS NOT NULL AND TRIM(visit_date) != ''").fetchone()[0]
+    cancel_count = conn.execute("SELECT COUNT(*) FROM canceled_leads").fetchone()[0]
     conn.close()
-
     update_info = get_update_info()
-
-    return render_template(
-        "dashboard.html",
-        total_customers=total_customers,
-        total_sales=total_sales,
-        today_followup_count=today_followup_count,
-        missed_followup_count=missed_followup_count,
-        upcoming_followup_count=upcoming_followup_count,
-        visit_count=visit_count,
-        cancel_count=cancel_count,
-        today_followups=today_followups,
-        app_version=APP_VERSION,
-        update_info=update_info
-    )
-
+    return render_template("dashboard.html", total_customers=total_customers,
+        total_sales=total_sales, today_followup_count=today_followup_count,
+        missed_followup_count=missed_followup_count, upcoming_followup_count=upcoming_followup_count,
+        visit_count=visit_count, cancel_count=cancel_count, today_followups=today_followups,
+        app_version=APP_VERSION, update_info=update_info)
 
 @app.route("/backup")
 def backup():
@@ -1016,113 +987,36 @@ def restore_database():
     """
 @app.route("/reports")
 def reports():
-
     if not session.get("logged_in"):
         return redirect("/")
 
     payment_date = request.args.get("payment_date")
     expense_date = request.args.get("expense_date")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            report = cloud.reports({"payment_date": payment_date, "expense_date": expense_date})
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return render_template("reports.html", **report)
 
     conn = get_db()
-
-    total_sales = conn.execute(
-        "SELECT COALESCE(SUM(sales), 0) FROM customers"
-    ).fetchone()[0]
-
-    total_paid = conn.execute(
-        "SELECT COALESCE(SUM(paid), 0) FROM customers"
-    ).fetchone()[0]
-
+    total_sales = conn.execute("SELECT COALESCE(SUM(sales), 0) FROM customers").fetchone()[0]
+    total_paid = conn.execute("SELECT COALESCE(SUM(paid), 0) FROM customers").fetchone()[0]
     total_due = total_sales - total_paid
-
-    total_expenses = conn.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM expenses"
-    ).fetchone()[0]
-
+    total_expenses = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses").fetchone()[0]
     net_profit = total_sales - total_expenses
-
-    category_expenses = conn.execute("""
-        SELECT
-            category,
-            COALESCE(SUM(amount), 0) AS total
-        FROM expenses
-        GROUP BY category
-        ORDER BY total DESC
-    """).fetchall()
-
-    total_payments = conn.execute(
-        "SELECT COALESCE(SUM(amount), 0) FROM payments"
-    ).fetchone()[0]
-    customers = conn.execute("""
-        SELECT
-            id,
-            name,
-            phone,
-            sales,
-            paid,
-            (sales - paid) AS due
-        FROM customers
-        ORDER BY id DESC
-    """).fetchall()
-    payment_history = conn.execute("""
-        SELECT
-            payments.id,
-            payments.amount,
-            payments.payment_date,
-            payments.note,
-            customers.name,
-            customers.phone
-        FROM payments
-        JOIN customers
-        ON payments.customer_id = customers.id
-        ORDER BY payments.id DESC
-    """).fetchall()
-    if payment_date:
-        date_payments = conn.execute("""
-            SELECT
-                payments.id,
-                payments.amount,
-                payments.payment_date,
-                payments.note,
-                customers.name,
-                customers.phone
-            FROM payments
-            JOIN customers
-            ON payments.customer_id = customers.id
-            WHERE payments.payment_date = ?
-            ORDER BY payments.id DESC
-        """, (payment_date,)).fetchall()
-    else:
-        date_payments = []
-
-    if expense_date:
-        date_expenses = conn.execute("""
-            SELECT *
-            FROM expenses
-            WHERE expense_date = ?
-            ORDER BY id DESC
-        """, (expense_date,)).fetchall()
-    else:
-        date_expenses = []
-
+    category_expenses = conn.execute("SELECT category, COALESCE(SUM(amount), 0) AS total FROM expenses GROUP BY category ORDER BY total DESC").fetchall()
+    total_payments = conn.execute("SELECT COALESCE(SUM(amount), 0) FROM payments").fetchone()[0]
+    customers = conn.execute("SELECT id,name,phone,sales,paid,(sales-paid) AS due FROM customers ORDER BY id DESC").fetchall()
+    payment_history = conn.execute("SELECT payments.id,payments.amount,payments.payment_date,payments.note,customers.name,customers.phone FROM payments JOIN customers ON payments.customer_id=customers.id ORDER BY payments.id DESC").fetchall()
+    date_payments = conn.execute("SELECT payments.id,payments.amount,payments.payment_date,payments.note,customers.name,customers.phone FROM payments JOIN customers ON payments.customer_id=customers.id WHERE payments.payment_date=? ORDER BY payments.id DESC", (payment_date,)).fetchall() if payment_date else []
+    date_expenses = conn.execute("SELECT * FROM expenses WHERE expense_date=? ORDER BY id DESC", (expense_date,)).fetchall() if expense_date else []
     conn.close()
-
-    return render_template(
-        "reports.html",
-        total_sales=total_sales,
-        total_paid=total_paid,
-        total_due=total_due,
-        total_payments=total_payments,
-        total_expenses=total_expenses,
-        net_profit=net_profit,
-        category_expenses=category_expenses,
-        customers=customers,
-        payment_history=payment_history,
-        date_payments=date_payments,
-        payment_date=payment_date,
-        date_expenses=date_expenses,
-        expense_date=expense_date
-    )
+    return render_template("reports.html", total_sales=total_sales,total_paid=total_paid,total_due=total_due,
+        total_payments=total_payments,total_expenses=total_expenses,net_profit=net_profit,
+        category_expenses=category_expenses,customers=customers,payment_history=payment_history,
+        date_payments=date_payments,payment_date=payment_date,date_expenses=date_expenses,expense_date=expense_date)
 
 @app.route("/export-customers")
 def export_customers():
