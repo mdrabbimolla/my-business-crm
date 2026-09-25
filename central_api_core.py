@@ -353,6 +353,17 @@ def register_core_routes(app, db, require_token):
         total=conn.execute("SELECT COALESCE(SUM(amount),0) FROM expenses").fetchone()[0]; conn.close()
         return jsonify(expenses=[dict(x) for x in rows],total_expenses=total)
 
+    @api.get("/api/expenses/<int:expense_id>")
+    @require_token
+    def get_expense(expense_id):
+        conn=db()
+        row=conn.execute("SELECT * FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="expense not found"),404
+        conn.close()
+        return jsonify(expense=dict(row))
+
     @api.put("/api/expenses/<int:expense_id>")
     @require_token
     def update_expense(expense_id):
