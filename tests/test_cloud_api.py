@@ -21,7 +21,7 @@ class CloudApiTests(unittest.TestCase):
         conn = db()
         for table in (
             "auth_tokens", "lead_notes", "followups", "canceled_leads",
-            "payments", "expenses", "leads", "customers", "projects", "users",
+            "payments", "expenses", "leads", "customers", "projects", "users", "project_files",
         ):
             conn.execute(f"DELETE FROM {table}")
         conn.commit()
@@ -427,6 +427,62 @@ class CloudApiTests(unittest.TestCase):
 
         self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
         self.assertEqual(self.client.get("/api/expenses").status_code, 401)
+
+
+    def test_project_files_are_central(self):
+        bootstrap = self.client.post("/api/bootstrap-user", json={
+            "username": "admin", "password": "1234", "name": "Admin", "role": "Admin"
+        })
+        self.assertEqual(bootstrap.status_code, 201)
+        login = self.client.post("/api/login", json={"username": "admin", "password": "1234"})
+        self.assertEqual(login.status_code, 200)
+        token = login.get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        project = self.client.post(
+            "/api/projects",
+            json={"name": "File Project", "location": "Dhaka", "status": "Active"},
+            headers=headers,
+        )
+        self.assertEqual(project.status_code, 201)
+        project_id = project.get_json()["project"]["id"]
+
+        text = self.client.post(
+            f"/api/projects/{project_id}/files",
+            json={"title": "Project Note", "item_type": "text", "text_content": "Central text"},
+            headers=headers,
+        )
+        self.assertEqual(text.status_code, 201)
+        text_id = text.get_json()["file"]["id"]
+
+        import base64
+        payload = base64.b64encode(b"central-pdf-bytes").decode("ascii")
+        upload = self.client.post(
+            f"/api/projects/{project_id}/files",
+            json={
+                "title": "Plan PDF",
+                "item_type": "file",
+                "file_name": "plan.pdf",
+                "mime_type": "application/pdf",
+                "data_base64": payload,
+            },
+            headers=headers,
+        )
+        self.assertEqual(upload.status_code, 201)
+        file_id = upload.get_json()["file"]["id"]
+
+        listing = self.client.get(f"/api/projects/{project_id}/files", headers=headers)
+        self.assertEqual(listing.status_code, 200)
+        self.assertEqual(len(listing.get_json()["files"]), 2)
+
+        fetched = self.client.get(f"/api/project-files/{file_id}", headers=headers)
+        self.assertEqual(fetched.status_code, 200)
+        self.assertEqual(fetched.get_json()["file"]["data_base64"], payload)
+
+        deleted = self.client.delete(f"/api/project-files/{text_id}", headers=headers)
+        self.assertEqual(deleted.status_code, 200)
+        listing_after = self.client.get(f"/api/projects/{project_id}/files", headers=headers)
+        self.assertEqual(len(listing_after.get_json()["files"]), 1)
 
 if __name__ == "__main__":
     unittest.main()
