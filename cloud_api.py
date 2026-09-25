@@ -73,6 +73,12 @@ def init_cloud_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL NOT NULL, expense_date TEXT,
         category TEXT, note TEXT, created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS project_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL,
+        title TEXT NOT NULL, item_type TEXT NOT NULL, file_name TEXT,
+        mime_type TEXT, text_content TEXT, file_data BLOB, created_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
     CREATE INDEX IF NOT EXISTS idx_cloud_followups_date ON followups(follow_up_date);
     CREATE INDEX IF NOT EXISTS idx_cloud_lead_notes_lead ON lead_notes(lead_id, id DESC);
     CREATE INDEX IF NOT EXISTS idx_cloud_canceled_date ON canceled_leads(cancelled_date, id DESC);
