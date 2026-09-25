@@ -97,5 +97,31 @@ class CloudApiTests(unittest.TestCase):
         )
         self.assertEqual(second.status_code, 409)
 
+    def test_core_shared_customer_payment_flow(self):
+        login = self.client.post("/api/login", json={"username":"sales2","password":"pass-123"})
+        self.assertEqual(login.status_code, 200)
+        token = login.json["token"]
+        headers = {"Authorization":f"Bearer {token}"}
+
+        customer = self.client.post("/api/customers", json={
+            "name":"Customer One","phone":"01800000003","sales":100000,"paid":0
+        }, headers=headers)
+        self.assertEqual(customer.status_code, 201)
+        customer_id = customer.json["customer"]["id"]
+
+        payment = self.client.post(f"/api/customers/{customer_id}/payments",
+                                   json={"amount":25000,"payment_date":"2026-09-25"},
+                                   headers=headers)
+        self.assertEqual(payment.status_code, 201)
+
+        view = self.client.get(f"/api/customers/{customer_id}", headers=headers)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.json["customer"]["paid"], 25000)
+        self.assertEqual(view.json["customer"]["due"], 75000)
+
+    def test_core_unauthorized_access_is_blocked(self):
+        self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
+        self.assertEqual(self.client.get("/api/expenses").status_code, 401)
+
 if __name__ == "__main__":
     unittest.main()
