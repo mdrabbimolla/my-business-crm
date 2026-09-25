@@ -46,6 +46,39 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.json["user"]["username"], "sales1")
 
+    def test_admin_can_list_create_and_reset_users(self):
+        bootstrap = self.client.post(
+            "/api/bootstrap-user",
+            json={"username":"admin-user","password":"admin-pass","name":"Admin","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"},
+        )
+        self.assertEqual(bootstrap.status_code, 201)
+        login = self.client.post("/api/login", json={"username":"admin-user","password":"admin-pass"})
+        self.assertEqual(login.status_code, 200)
+        headers = {"Authorization": f"Bearer {login.json['token']}"}
+
+        created = self.client.post(
+            "/api/users",
+            json={"username":"new-sales","password":"sales-pass","name":"New Sales","role":"Sales","active":1},
+            headers=headers,
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json["user"]["username"], "new-sales")
+
+        users = self.client.get("/api/users", headers=headers)
+        self.assertEqual(users.status_code, 200)
+        self.assertTrue(any(u["username"] == "new-sales" for u in users.json["users"]))
+
+        reset = self.client.put(
+            f"/api/users/{created.json['user']['id']}/password",
+            json={"password":"new-sales-pass"},
+            headers=headers,
+        )
+        self.assertEqual(reset.status_code, 200)
+
+        new_login = self.client.post("/api/login", json={"username":"new-sales","password":"new-sales-pass"})
+        self.assertEqual(new_login.status_code, 200)
+
     def test_wrong_password_rejected(self):
         response = self.client.post("/api/login", json={"username":"sales1","password":"wrong"})
         self.assertEqual(response.status_code, 401)
