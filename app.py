@@ -75,6 +75,29 @@ def _cloud_client(token=None):
     return CloudCRMClient(base_url=_cloud_api_base_url(), token=token)
 
 
+@app.route("/users")
+def crm_users_page():
+    if not session.get("logged_in"):
+        return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            me = cloud.me()
+            if me.get("user", {}).get("role") != "Admin":
+                return "Access Denied"
+            return render_template("users.html", users=cloud.users())
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn = get_db()
+    current_user = conn.execute("SELECT role FROM users WHERE username=? AND active=1", (session.get("username"),)).fetchone()
+    if not current_user or current_user["role"] != "Admin":
+        conn.close()
+        return "Access Denied"
+    users = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
+    conn.close()
+    return render_template("users.html", users=users)
+
+
 def _sync_cloud_user_to_local(user, password):
     if not user:
         return False
