@@ -38,6 +38,10 @@ def test_login_page_and_local_login():
 
         response = client.get("/dashboard")
         assert response.status_code == 200
+
+        response = client.get("/users")
+        assert response.status_code == 200
+        assert b"CRM Users" in response.data
     finally:
         try:
             os.remove(db_file)
