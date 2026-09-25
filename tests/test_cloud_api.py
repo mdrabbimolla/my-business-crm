@@ -102,7 +102,10 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(second.status_code, 409)
 
     def test_core_shared_customer_payment_flow(self):
-        login = self.client.post("/api/login", json={"username":"sales2","password":"pass-123"})
+        self.client.post("/api/bootstrap-user",
+            json={"username":"customer-sales","password":"pass-123","name":"Customer Test","role":"Sales"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        login = self.client.post("/api/login", json={"username":"customer-sales","password":"pass-123"})
         self.assertEqual(login.status_code, 200)
         token = login.json["token"]
         headers = {"Authorization":f"Bearer {token}"}
