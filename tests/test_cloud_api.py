@@ -225,6 +225,10 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(payment.status_code, 201)
         payment_id = payment.json["payment"]["id"]
 
+        direct_payment = self.client.get(f"/api/payments/{payment_id}", headers=headers)
+        self.assertEqual(direct_payment.status_code, 200)
+        self.assertEqual(direct_payment.json["payment"]["customer_id"], customer_id)
+
         updated_payment = self.client.put(f"/api/payments/{payment_id}",
             json={"amount":30000,"payment_date":"2026-09-26","note":"Updated"},
             headers=headers)
@@ -234,6 +238,8 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json["customer"]["paid"], 40000)
         self.assertEqual(detail.json["customer"]["due"], 160000)
+        self.assertEqual(len(detail.json["customer"]["payments"]), 1)
+        self.assertEqual(detail.json["customer"]["payments"][0]["due_after_payment"], 170000)
 
         updated_customer = self.client.put(f"/api/customers/{customer_id}",
             json={"name":"Central Customer Updated","phone":"01811111111","sales":250000,
