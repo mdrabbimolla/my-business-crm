@@ -680,61 +680,35 @@ def android_whatsapp():
 
 @app.route("/change-password", methods=["GET", "POST"])
 def change_password():
-
     if not session.get("logged_in"):
         return redirect("/")
-
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        if request.method == "POST":
+            current_password = request.form.get("current_password", "")
+            new_password = request.form.get("new_password", "")
+            confirm_password = request.form.get("confirm_password", "")
+            if not new_password:
+                return "New password cannot be empty"
+            if new_password != confirm_password:
+                return "New passwords do not match"
+            try:
+                cloud.change_my_password(current_password, new_password)
+            except CloudAPIError as exc:
+                return "Central CRM error: " + str(exc)
+            return "<h2>✅ Password Changed Successfully!</h2><a href='/dashboard'>⬅ Back to Dashboard</a>"
+        return render_template("change_password.html")
     if request.method == "POST":
-
-        current_password = request.form.get("current_password")
-        new_password = request.form.get("new_password")
-        confirm_password = request.form.get("confirm_password")
-
-        conn = get_db()
-
-        current_username = session.get("username")
-
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND active = 1",
-            (current_username,)
-        ).fetchone()
-
-        if not user:
-            conn.close()
-            return "User not found"
-
-        if current_password != user["password"]:
-            conn.close()
-            return "Current password is incorrect"
-
-        if not new_password:
-            conn.close()
-            return "New password cannot be empty"
-
-        if new_password != confirm_password:
-            conn.close()
-            return "New passwords do not match"
-
-        conn.execute(
-            """
-            UPDATE users
-            SET password = ?
-            WHERE username = ?
-            """,
-            (new_password, current_username)
-        )
-
-        conn.commit()
-        conn.close()
-
-        return """
-        <h2>✅ Password Changed Successfully!</h2>
-        <a href="/dashboard">⬅ Back to Dashboard</a>
-        """
-
-    return render_template("change_password.html")
-
-@app.route("/logout")
+        current_password=request.form.get("current_password"); new_password=request.form.get("new_password"); confirm_password=request.form.get("confirm_password")
+        conn=get_db(); current_username=session.get("username")
+        user=conn.execute("SELECT * FROM users WHERE username=? AND active=1",(current_username,)).fetchone()
+        if not user: conn.close(); return "User not found"
+        if current_password != user["password"]: conn.close(); return "Current password is incorrect"
+        if not new_password: conn.close(); return "New password cannot be empty"
+        if new_password != confirm_password: conn.close(); return "New passwords do not match"
+        conn.execute("UPDATE users SET password=? WHERE username=?",(new_password,current_username)); conn.commit(); conn.close()
+        return "<h2>✅ Password Changed Successfully!</h2><a href='/dashboard'>⬅ Back to Dashboard</a>"
+    return render_template("change_password.html")@app.route("/logout")
 def logout():
 
     session.clear()
@@ -743,123 +717,73 @@ def logout():
 
 @app.route("/add-user", methods=["GET", "POST"])
 def add_user():
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    conn = get_db()
-
-    current_user = conn.execute(
-        "SELECT role FROM users WHERE username = ?",
-        (session.get("username"),)
-    ).fetchone()
-
-    if not current_user or current_user["role"] != "Admin":
-        conn.close()
-        return "Access Denied"
-
-    if request.method == "POST":
-
-        name = request.form.get("name", "").strip()
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-        role = request.form.get("role", "Sales")
-        active = request.form.get("active", "1")
-
-        if not username or not password:
-            conn.close()
-            return "Username and password are required"
-
-        existing_user = conn.execute(
-            "SELECT id FROM users WHERE username = ?",
-            (username,)
-        ).fetchone()
-
-        if existing_user:
-            conn.close()
-            return "Username already exists"
-
-        conn.execute("""
-            INSERT INTO users
-            (name, username, password, role, active)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            name,
-            username,
-            password,
-            role,
-            int(active)
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/users")
-
-    conn.close()
-
-    return render_template("add_user.html")
-
-
-@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            me = cloud.me()
+            if me.get("user", {}).get("role") != "Admin":
+                return "Access Denied"
+            if request.method == "POST":
+                data = {
+                    "name": request.form.get("name", "").strip(),
+                    "username": request.form.get("username", "").strip(),
+                    "password": request.form.get("password", "").strip(),
+                    "role": request.form.get("role", "Sales"),
+                    "active": request.form.get("active", "1"),
+                }
+                cloud.create_user(data)
+                return redirect("/users")
+            return render_template("add_user.html")
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db(); current_user=conn.execute("SELECT role FROM users WHERE username=?",(session.get("username"),)).fetchone()
+    if not current_user or current_user["role"]!="Admin": conn.close(); return "Access Denied"
+    if request.method=="POST":
+        name=request.form.get("name","").strip(); username=request.form.get("username","").strip(); password=request.form.get("password","").strip(); role=request.form.get("role","Sales"); active=request.form.get("active","1")
+        if not username or not password: conn.close(); return "Username and password are required"
+        if conn.execute("SELECT id FROM users WHERE username=?",(username,)).fetchone(): conn.close(); return "Username already exists"
+        conn.execute("INSERT INTO users(name,username,password,role,active) VALUES (?,?,?,?,?)",(name,username,password,role,int(active))); conn.commit(); conn.close(); return redirect("/users")
+    conn.close(); return render_template("add_user.html")@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
 def reset_password(user_id):
     if not session.get("logged_in"):
         return redirect("/")
-    conn = get_db()
-    admin = conn.execute("SELECT role FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
-    user = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not admin or admin["role"] != "Admin":
-        conn.close()
-        return "Access Denied"
-    if not user:
-        conn.close()
-        return "User not found"
-    if request.method == "POST":
-        new_password = request.form.get("new_password", "").strip()
-        confirm_password = request.form.get("confirm_password", "").strip()
-        if not new_password or new_password != confirm_password:
-            conn.close()
-            return "Password is empty or passwords do not match"
-        conn.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, user_id))
-        conn.commit()
-        conn.close()
-        return redirect("/users")
-    conn.close()
-    return render_template("reset_password.html", user=user)
-
-@app.route("/users")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            me=cloud.me()
+            if me.get("user",{}).get("role")!="Admin": return "Access Denied"
+            user=next((u for u in cloud.users() if int(u["id"])==int(user_id)),None)
+            if not user: return "User not found"
+            if request.method=="POST":
+                new_password=request.form.get("new_password","").strip(); confirm_password=request.form.get("confirm_password","").strip()
+                if not new_password or new_password!=confirm_password: return "Password is empty or passwords do not match"
+                cloud.reset_user_password(user_id,new_password); return redirect("/users")
+            return render_template("reset_password.html", user=user)
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); admin=conn.execute("SELECT role FROM users WHERE username=? AND active=1",(session.get("username"),)).fetchone(); user=conn.execute("SELECT * FROM users WHERE id=?",(user_id,)).fetchone()
+    if not admin or admin["role"]!="Admin": conn.close(); return "Access Denied"
+    if not user: conn.close(); return "User not found"
+    if request.method=="POST":
+        new_password=request.form.get("new_password","").strip(); confirm_password=request.form.get("confirm_password","").strip()
+        if not new_password or new_password!=confirm_password: conn.close(); return "Password is empty or passwords do not match"
+        conn.execute("UPDATE users SET password=? WHERE id=?",(new_password,user_id)); conn.commit(); conn.close(); return redirect("/users")
+    conn.close(); return render_template("reset_password.html", user=user)@app.route("/users")
 def users():
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    conn = get_db()
-
-    current_user = conn.execute(
-        "SELECT role FROM users WHERE username = ? AND active = 1",
-        (session.get("username"),)
-    ).fetchone()
-
-    if not current_user or current_user["role"] != "Admin":
-        conn.close()
-        return "Access Denied"
-
-    conn = get_db()
-
-    users = conn.execute("""
-        SELECT *
-        FROM users
-        ORDER BY id DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "users.html",
-        users=users
-    )
-
-@app.route("/update")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            me=cloud.me()
+            if me.get("user",{}).get("role")!="Admin": return "Access Denied"
+            return render_template("users.html", users=cloud.users())
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); current_user=conn.execute("SELECT role FROM users WHERE username=? AND active=1",(session.get("username"),)).fetchone()
+    if not current_user or current_user["role"]!="Admin": conn.close(); return "Access Denied"
+    users=conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall(); conn.close()
+    return render_template("users.html",users=users)@app.route("/update")
 def update_app():
     if not session.get("logged_in"):
         return redirect("/")
