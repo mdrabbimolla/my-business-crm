@@ -192,11 +192,51 @@ def create_project():
 @require_token
 def list_leads():
     conn = db()
+    conditions = []
+    params = []
+
     if g.user["role"] == "Sales":
-        rows = conn.execute("SELECT * FROM leads WHERE assigned_to=? ORDER BY id DESC",
-                            (g.user["username"],)).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM leads ORDER BY id DESC").fetchall()
+        conditions.append("leads.assigned_to = ?")
+        params.append(g.user["username"])
+
+    search = (request.args.get("search") or "").strip()
+    if search:
+        conditions.append("(leads.name LIKE ? OR leads.phone LIKE ?)")
+        like = "%" + search + "%"
+        params.extend([like, like])
+
+    project_id = (request.args.get("project_id") or "").strip()
+    if project_id:
+        try:
+            project_id_value = int(project_id)
+        except ValueError:
+            conn.close()
+            return jsonify(error="invalid project_id"), 400
+        conditions.append("leads.project_id = ?")
+        params.append(project_id_value)
+
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    query = """
+        SELECT leads.*,
+               projects.name AS project_name,
+               COALESCE(assigned_user.name, leads.assigned_to) AS assigned_user_name,
+               latest_note.note AS latest_note,
+               latest_note.note_date AS latest_note_date
+        FROM leads
+        LEFT JOIN projects ON projects.id = leads.project_id
+        LEFT JOIN users AS assigned_user ON assigned_user.username = leads.assigned_to
+        LEFT JOIN (
+            SELECT ln.lead_id, ln.note, ln.note_date
+            FROM lead_notes ln
+            INNER JOIN (
+                SELECT lead_id, MAX(id) AS max_id
+                FROM lead_notes
+                GROUP BY lead_id
+            ) newest ON newest.max_id = ln.id
+        ) latest_note ON latest_note.lead_id = leads.id
+    """ + where + " ORDER BY leads.id DESC"
+
+    rows = conn.execute(query, params).fetchall()
     conn.close()
     return jsonify(leads=[dict(r) for r in rows])
 
