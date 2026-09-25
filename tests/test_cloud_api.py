@@ -257,6 +257,70 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(deleted_customer.status_code, 200)
         self.assertEqual(self.client.get(f"/api/customers/{customer_id}", headers=headers).status_code, 404)
 
+    def test_followup_crud_cancel_and_visibility(self):
+        response = self.client.post("/api/bootstrap-user",
+            json={"username":"followup-admin","password":"pass-123","name":"Followup Admin","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        self.assertEqual(response.status_code, 201)
+        response = self.client.post("/api/bootstrap-user",
+            json={"username":"followup-sales","password":"pass-123","name":"Followup Sales","role":"Sales"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        self.assertEqual(response.status_code, 201)
+
+        admin_login = self.client.post("/api/login", json={"username":"followup-admin","password":"pass-123"})
+        sales_login = self.client.post("/api/login", json={"username":"followup-sales","password":"pass-123"})
+        admin_headers = {"Authorization": f"Bearer {admin_login.json['token']}"}
+        sales_headers = {"Authorization": f"Bearer {sales_login.json['token']}"}
+
+        project = self.client.post("/api/projects", json={"name":"Followup Project"}, headers=admin_headers)
+        self.assertEqual(project.status_code, 201)
+        project_id = project.json["project"]["id"]
+
+        lead = self.client.post("/api/leads", json={
+            "name":"Followup Lead","phone":"01611111111","project_id":project_id,
+            "assigned_to":"followup-sales","follow_up_date":"2026-09-26"
+        }, headers=admin_headers)
+        self.assertEqual(lead.status_code, 201)
+        lead_id = lead.json["lead"]["id"]
+
+        created = self.client.post("/api/followups", json={
+            "lead_id":lead_id,"name":"Followup Lead","phone":"01611111111",
+            "follow_up_date":"2026-09-26","note":"Call tomorrow","status":"New"
+        }, headers=sales_headers)
+        self.assertEqual(created.status_code, 201)
+        followup_id = created.json["followup"]["id"]
+
+        visible = self.client.get("/api/followups", headers=sales_headers)
+        self.assertEqual(visible.status_code, 200)
+        self.assertEqual(len(visible.json["followups"]), 1)
+
+        updated = self.client.put(f"/api/followups/{followup_id}", json={
+            "name":"Followup Lead Updated","phone":"01611111111",
+            "follow_up_date":"2026-09-27","note":"Updated note","status":"New"
+        }, headers=sales_headers)
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json["followup"]["follow_up_date"], "2026-09-27")
+
+        detail = self.client.get(f"/api/followups/{followup_id}", headers=sales_headers)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json["followup"]["note"], "Updated note")
+
+        cancelled = self.client.put(f"/api/followups/{followup_id}", json={
+            "name":"Followup Lead Updated","phone":"01611111111",
+            "follow_up_date":"2026-09-27","note":"No longer interested","status":"Cancel"
+        }, headers=sales_headers)
+        self.assertEqual(cancelled.status_code, 200)
+        self.assertTrue(cancelled.json["cancelled"])
+
+        self.assertEqual(self.client.get(f"/api/followups/{followup_id}", headers=sales_headers).status_code, 404)
+        canceled = self.client.get("/api/canceled-leads", headers=sales_headers)
+        self.assertEqual(canceled.status_code, 200)
+        self.assertEqual(len(canceled.json["canceled_leads"]), 1)
+
+        lead_after = self.client.get(f"/api/leads/{lead_id}", headers=sales_headers)
+        self.assertEqual(lead_after.status_code, 200)
+        self.assertIsNone(lead_after.json["lead"]["follow_up_date"])
+
     def test_core_unauthorized_access_is_blocked(self):
         self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
         self.assertEqual(self.client.get("/api/expenses").status_code, 401)
