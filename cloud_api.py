@@ -53,7 +53,30 @@ def init_cloud_db():
     );
     CREATE INDEX IF NOT EXISTS idx_cloud_leads_project ON leads(project_id);
     CREATE INDEX IF NOT EXISTS idx_cloud_customers_project ON customers(project_id);
+    CREATE TABLE IF NOT EXISTS lead_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER NOT NULL, note TEXT NOT NULL,
+        note_date TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY(lead_id) REFERENCES leads(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS canceled_leads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER, name TEXT, phone TEXT,
+        project_id INTEGER, project_name TEXT, assigned_to TEXT, follow_up_date TEXT,
+        note TEXT, cancelled_date TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY(lead_id) REFERENCES leads(id)
+    );
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER NOT NULL, amount REAL NOT NULL,
+        payment_date TEXT, note TEXT, created_at TEXT NOT NULL,
+        FOREIGN KEY(customer_id) REFERENCES customers(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS expenses (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL NOT NULL, expense_date TEXT,
+        category TEXT, note TEXT, created_at TEXT NOT NULL
+    );
     CREATE INDEX IF NOT EXISTS idx_cloud_followups_date ON followups(follow_up_date);
+    CREATE INDEX IF NOT EXISTS idx_cloud_lead_notes_lead ON lead_notes(lead_id, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_cloud_canceled_date ON canceled_leads(cancelled_date, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_cloud_payments_customer ON payments(customer_id, id DESC);
     """)
     conn.commit()
     conn.close()
@@ -211,6 +234,9 @@ def list_customers():
     rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
     conn.close()
     return jsonify(customers=[dict(r) for r in rows])
+
+from central_api_core import register_core_routes
+register_core_routes(app, db, require_token)
 
 if __name__ == "__main__":
     init_cloud_db()
