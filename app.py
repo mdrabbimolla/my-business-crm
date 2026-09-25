@@ -2,6 +2,7 @@ from datetime import date
 from urllib.parse import quote
 import json
 import base64
+import binascii
 import urllib.request
 import os
 import io
