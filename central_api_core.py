@@ -26,6 +26,88 @@ def register_core_routes(app, db, require_token):
         row=conn.execute(q,p).fetchone()
         return {"type":"customer","id":row["id"],"name":row["name"]} if row else None
 
+    @api.get("/api/lead-notes/<int:lead_id>")
+    @require_token
+    def list_lead_notes(lead_id):
+        conn=db(); lead=visible_lead(conn,lead_id)
+        if not lead: conn.close(); return jsonify(error="lead not found or access denied"),404
+        rows=conn.execute("SELECT * FROM lead_notes WHERE lead_id=? ORDER BY id DESC",(lead_id,)).fetchall()
+        conn.close(); return jsonify(lead=dict(lead),notes=[dict(x) for x in rows])
+
+    @api.post("/api/lead-notes/<int:lead_id>")
+    @require_token
+    def create_lead_note(lead_id):
+        data=request.get_json(silent=True) or {}; note=(data.get("note") or "").strip()
+        if not note: return jsonify(error="note is required"),400
+        conn=db(); lead=visible_lead(conn,lead_id)
+        if not lead: conn.close(); return jsonify(error="lead not found or access denied"),404
+        note_date=(data.get("note_date") or datetime.now(timezone.utc).date().isoformat()).strip()
+        cur=conn.execute("INSERT INTO lead_notes(lead_id,note,note_date,created_at) VALUES(?,?,?,?)",(lead_id,note,note_date,now()))
+        conn.commit(); row=conn.execute("SELECT * FROM lead_notes WHERE id=?",(cur.lastrowid,)).fetchone(); conn.close()
+        return jsonify(note=dict(row)),201
+
+    @api.put("/api/leads/<int:lead_id>/reassign")
+    @require_token
+    def reassign_lead_api(lead_id):
+        if g.user["role"] not in {"Admin","Manager"}: return jsonify(error="access denied"),403
+        data=request.get_json(silent=True) or {}; assigned_to=data.get("assigned_to") or None
+        conn=db(); lead=conn.execute("SELECT * FROM leads WHERE id=?",(lead_id,)).fetchone()
+        if not lead: conn.close(); return jsonify(error="lead not found"),404
+        if assigned_to:
+            u=conn.execute("SELECT username FROM users WHERE username=? AND role='Sales' AND active=1",(assigned_to,)).fetchone()
+            if not u: conn.close(); return jsonify(error="sales user not found"),400
+        conn.execute("UPDATE leads SET assigned_to=? WHERE id=?",(assigned_to,lead_id)); conn.commit()
+        row=conn.execute("""SELECT leads.*,projects.name AS project_name,users.name AS assigned_user_name
+                            FROM leads LEFT JOIN projects ON leads.project_id=projects.id
+                            LEFT JOIN users ON leads.assigned_to=users.username WHERE leads.id=?""",(lead_id,)).fetchone()
+        conn.close(); return jsonify(lead=dict(row))
+
+    @api.get("/api/reports/daily")
+    @require_token
+    def daily_report_api():
+        report_date=(request.args.get("date") or datetime.now(timezone.utc).date().isoformat()).strip()
+        project_filter=request.args.get("project_id","").strip(); conn=db()
+        projects=conn.execute("SELECT id,name FROM projects WHERE status='Active' ORDER BY name").fetchall()
+        params=[report_date,report_date]
+        q="""SELECT leads.id,leads.name,leads.phone,leads.project_id,leads.created_at,leads.follow_up_date,
+                    leads.visit_date,leads.visit_time,leads.visit_status,leads.visit_completed_date,
+                    projects.name AS project_name,ln.note,ln.note_date,
+                    (SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id=ln.lead_id AND z.id<ln.id) AS previous_note_count
+             FROM lead_notes ln JOIN leads ON leads.id=ln.lead_id LEFT JOIN projects ON projects.id=leads.project_id
+             WHERE ln.note_date=? AND ln.id=(SELECT MAX(ln2.id) FROM lead_notes ln2 WHERE ln2.lead_id=ln.lead_id AND ln2.note_date=?)"""
+        if project_filter: q+=" AND leads.project_id=?"; params.append(project_filter)
+        if g.user["role"]=="Sales": q+=" AND leads.assigned_to=?"; params.append(g.user["username"])
+        q+=" ORDER BY projects.name ASC, leads.id DESC"; talked=conn.execute(q,params).fetchall()
+        vp=[report_date]; vq="SELECT COUNT(*) FROM leads WHERE visit_date=? AND visit_date IS NOT NULL"
+        if project_filter: vq+=" AND project_id=?"; vp.append(project_filter)
+        if g.user["role"]=="Sales": vq+=" AND assigned_to=?"; vp.append(g.user["username"])
+        visits=conn.execute(vq,vp).fetchone()[0]
+        cp=[report_date]; cq="SELECT COUNT(*) FROM leads WHERE visit_status='Completed' AND visit_completed_date=?"
+        if project_filter: cq+=" AND project_id=?"; cp.append(project_filter)
+        if g.user["role"]=="Sales": cq+=" AND assigned_to=?"; cp.append(g.user["username"])
+        completed=conn.execute(cq,cp).fetchone()[0]
+        xp=[report_date]; xq="SELECT COUNT(*) FROM canceled_leads WHERE cancelled_date=?"
+        if project_filter: xq+=" AND project_id=?"; xp.append(project_filter)
+        if g.user["role"]=="Sales": xq+=" AND assigned_to=?"; xp.append(g.user["username"])
+        cancelled=conn.execute(xq,xp).fetchone()[0]
+        new_count=sum(1 for r in talked if (r["created_at"] or "")[:10]==report_date and (r["previous_note_count"] or 0)==0)
+        follow_count=sum(1 for r in talked if r["follow_up_date"]==report_date and (r["previous_note_count"] or 0)>0)
+        conn.close()
+        return jsonify(report_date=report_date,project_filter=project_filter,projects=[dict(r) for r in projects],
+                       talked_leads=[dict(r) for r in talked],talked_count=len(talked),new_leads_count=new_count,
+                       followup_leads_count=follow_count,visits_scheduled=visits,visits_completed=completed,cancelled_count=cancelled)
+    
+    @api.get("/api/reports/monthly")
+    @require_token
+    def monthly_report_api():
+        conn=db()
+        rows=conn.execute("""SELECT month,SUM(sales) AS sales,SUM(payments) AS payments,SUM(expenses) AS expenses FROM
+            (SELECT strftime('%Y-%m',created_at) month,sales,0 payments,0 expenses FROM customers
+             UNION ALL SELECT strftime('%Y-%m',payment_date),0,amount,0 FROM payments WHERE payment_date IS NOT NULL
+             UNION ALL SELECT strftime('%Y-%m',expense_date),0,0,amount FROM expenses WHERE expense_date IS NOT NULL)
+            WHERE month IS NOT NULL GROUP BY month ORDER BY month DESC""").fetchall()
+        conn.close(); return jsonify(monthly_report=[dict(x) for x in rows])
+
     @api.put("/api/projects/<int:project_id>")
     @require_token
     def update_project(project_id):
