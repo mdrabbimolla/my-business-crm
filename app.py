@@ -2127,7 +2127,7 @@ def edit_expense(expense_id):
     cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
     if cloud and cloud.enabled:
         try:
-            expense=cloud._request("GET", f"/api/expenses/{int(expense_id)}").get("expense")
+            expense=cloud.get_expense(expense_id).get("expense")
             if not expense:
                 return "Expense not found"
             if request.method == "POST":
