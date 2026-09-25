@@ -432,7 +432,7 @@ class CloudApiTests(unittest.TestCase):
     def test_project_files_are_central(self):
         bootstrap = self.client.post("/api/bootstrap-user", json={
             "username": "admin", "password": "1234", "name": "Admin", "role": "Admin"
-        })
+        }, headers={"X-CRM-API-SECRET": "test-secret"})
         self.assertEqual(bootstrap.status_code, 201)
         login = self.client.post("/api/login", json={"username": "admin", "password": "1234"})
         self.assertEqual(login.status_code, 200)
