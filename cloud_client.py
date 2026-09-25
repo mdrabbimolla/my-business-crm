@@ -87,8 +87,16 @@ class CloudCRMClient:
     def delete_project(self, project_id):
         return self._request("DELETE", f"/api/projects/{int(project_id)}")
 
-    def leads(self):
-        return self._request("GET", "/api/leads").get("leads", [])
+    def leads(self, params=None):
+        path = "/api/leads"
+        if params:
+            from urllib.parse import urlencode
+            clean = {k: v for k, v in params.items() if v not in (None, "")}
+            if clean: path += "?" + urlencode(clean)
+        return self._request("GET", path).get("leads", [])
+
+    def delete_lead(self, lead_id):
+        return self._request("DELETE", f"/api/leads/{int(lead_id)}")
 
     def create_lead(self, data):
         return self._request("POST", "/api/leads", data)
