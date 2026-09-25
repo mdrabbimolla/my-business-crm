@@ -79,6 +79,18 @@ def register_core_routes(app, db, require_token):
         conn.commit(); out=conn.execute("SELECT * FROM leads WHERE id=?", (lead_id,)).fetchone(); conn.close()
         return jsonify(lead=dict(out))
 
+    @api.delete("/api/leads/<int:lead_id>")
+    @require_token
+    def delete_lead(lead_id):
+        if g.user["role"] != "Admin": return jsonify(error="access denied"),403
+        conn=db(); row=conn.execute("SELECT id FROM leads WHERE id=?", (lead_id,)).fetchone()
+        if not row: conn.close(); return jsonify(error="lead not found"),404
+        conn.execute("DELETE FROM followups WHERE lead_id=?", (lead_id,))
+        conn.execute("DELETE FROM lead_notes WHERE lead_id=?", (lead_id,))
+        conn.execute("DELETE FROM canceled_leads WHERE lead_id=?", (lead_id,))
+        conn.execute("DELETE FROM leads WHERE id=?", (lead_id,)); conn.commit(); conn.close()
+        return jsonify(deleted=True)
+
     @api.post("/api/leads/<int:lead_id>/notes")
     @require_token
     def add_note(lead_id):
