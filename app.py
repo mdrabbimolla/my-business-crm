@@ -1877,276 +1877,198 @@ def receipt_settings():
     )
 @app.route("/add-followup", methods=["GET", "POST"])
 def add_followup():
-
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        if request.method == "POST":
+            data = {
+                "name": request.form.get("name", "").strip(),
+                "phone": request.form.get("phone", "").strip(),
+                "follow_up_date": request.form.get("follow_up_date") or None,
+                "note": request.form.get("note", "").strip(),
+                "status": request.form.get("status", "New")
+            }
+            try:
+                cloud.create_followup(data)
+            except CloudAPIError as exc:
+                return "Central CRM error: " + str(exc)
+            return redirect("/followups")
+        return render_template("add_followup.html")
 
     if request.method == "POST":
-
-        name = request.form.get("name")
-        phone = request.form.get("phone")
-        follow_up_date = request.form.get("follow_up_date")
-        note = request.form.get("note")
-        status = request.form.get("status")
-
         conn = get_db()
-
-        conn.execute("""
-            INSERT INTO followups
-            (name, phone, follow_up_date, note, status)
-            VALUES (?, ?, ?, ?, ?)
-        """, (
-            name,
-            phone,
-            follow_up_date,
-            note,
-            status
-        ))
-
+        conn.execute("""INSERT INTO followups
+                        (name, phone, follow_up_date, note, status)
+                        VALUES (?, ?, ?, ?, ?)""",
+                     (request.form.get("name"), request.form.get("phone"),
+                      request.form.get("follow_up_date"), request.form.get("note"),
+                      request.form.get("status")))
         conn.commit()
         conn.close()
-
         return redirect("/followups")
-
     return render_template("add_followup.html")
+
+
 @app.route("/followups")
 def followups():
-
     if not session.get("logged_in"):
         return redirect("/")
 
     status = request.args.get("status")
     date_filter = request.args.get("date_filter")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
 
-    conn = get_db()
-
-    if status and date_filter:
-        followups = conn.execute("""
-            SELECT * FROM followups
-            WHERE status = ?
-            AND follow_up_date = ?
-            ORDER BY follow_up_date ASC, id DESC
-        """, (status, date_filter)).fetchall()
-
-    elif status:
-        followups = conn.execute("""
-            SELECT * FROM followups
-            WHERE status = ?
-            ORDER BY follow_up_date ASC, id DESC
-        """, (status,)).fetchall()
-
-    elif date_filter == "today":
-        followups = conn.execute("""
-            SELECT * FROM followups
-            WHERE follow_up_date = ?
-            ORDER BY follow_up_date ASC, id DESC
-        """, (date.today().isoformat(),)).fetchall()
-
-    elif date_filter == "missed":
-        followups = conn.execute("""
-            SELECT * FROM followups
-            WHERE follow_up_date < ?
-            ORDER BY follow_up_date ASC, id DESC
-        """, (date.today().isoformat(),)).fetchall()
-
-    elif date_filter == "upcoming":
-        followups = conn.execute("""
-            SELECT * FROM followups
-            WHERE follow_up_date > ?
-            ORDER BY follow_up_date ASC, id DESC
-        """, (date.today().isoformat(),)).fetchall()
-
+    if cloud and cloud.enabled:
+        try:
+            rows = cloud.followups()
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        today = date.today().isoformat()
+        if status:
+            rows = [r for r in rows if r.get("status") == status]
+        if date_filter == "today":
+            rows = [r for r in rows if r.get("follow_up_date") == today]
+        elif date_filter == "missed":
+            rows = [r for r in rows if r.get("follow_up_date") and r.get("follow_up_date") < today]
+        elif date_filter == "upcoming":
+            rows = [r for r in rows if r.get("follow_up_date") and r.get("follow_up_date") > today]
+        rows.sort(key=lambda r: ((r.get("follow_up_date") or ""), -(int(r.get("id") or 0))))
+        followup_rows = rows
     else:
-        followups = conn.execute("""
-            SELECT * FROM followups
-            ORDER BY follow_up_date ASC, id DESC
-        """).fetchall()
-    conn.close()
+        conn = get_db()
+        if status and date_filter:
+            followup_rows = conn.execute("""SELECT * FROM followups
+                WHERE status=? AND follow_up_date=? ORDER BY follow_up_date ASC,id DESC""",
+                (status, date_filter)).fetchall()
+        elif status:
+            followup_rows = conn.execute("""SELECT * FROM followups
+                WHERE status=? ORDER BY follow_up_date ASC,id DESC""", (status,)).fetchall()
+        elif date_filter == "today":
+            followup_rows = conn.execute("""SELECT * FROM followups
+                WHERE follow_up_date=? ORDER BY follow_up_date ASC,id DESC""",
+                (date.today().isoformat(),)).fetchall()
+        elif date_filter == "missed":
+            followup_rows = conn.execute("""SELECT * FROM followups
+                WHERE follow_up_date<? ORDER BY follow_up_date ASC,id DESC""",
+                (date.today().isoformat(),)).fetchall()
+        elif date_filter == "upcoming":
+            followup_rows = conn.execute("""SELECT * FROM followups
+                WHERE follow_up_date>? ORDER BY follow_up_date ASC,id DESC""",
+                (date.today().isoformat(),)).fetchall()
+        else:
+            followup_rows = conn.execute("""SELECT * FROM followups
+                ORDER BY follow_up_date ASC,id DESC""").fetchall()
+        conn.close()
 
     today = date.today().isoformat()
-
     today_followups = []
     upcoming_followups = []
     old_followups = []
-
-    for followup in followups:
-
-        followup_date = followup["follow_up_date"]
-
+    for followup in followup_rows:
+        followup_date = followup["follow_up_date"] if isinstance(followup, dict) else followup["follow_up_date"]
         if followup_date == today:
             today_followups.append(followup)
-
         elif followup_date and followup_date > today:
             upcoming_followups.append(followup)
-
         else:
             old_followups.append(followup)
 
-    return render_template(
-        "followups.html",
-        followups=followups,
-        today_followups=today_followups,
-        upcoming_followups=upcoming_followups,
-        old_followups=old_followups
-    )
+    return render_template("followups.html", followups=followup_rows,
+                           today_followups=today_followups,
+                           upcoming_followups=upcoming_followups,
+                           old_followups=old_followups)
+
+
 @app.route("/edit-followup/<int:followup_id>", methods=["GET", "POST"])
 def edit_followup(followup_id):
-
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            followup = cloud.get_followup(followup_id).get("followup")
+            if not followup:
+                return "Follow-up not found"
+            if request.method == "POST":
+                data = {
+                    "name": request.form.get("name", "").strip(),
+                    "phone": request.form.get("phone", "").strip(),
+                    "follow_up_date": request.form.get("follow_up_date") or None,
+                    "note": request.form.get("note", "").strip(),
+                    "status": request.form.get("status", "New")
+                }
+                cloud.update_followup(followup_id, data)
+                return redirect("/canceled" if data["status"] == "Cancel" else "/followups")
+            return render_template("edit_followup.html", followup=followup)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
 
     conn = get_db()
-
-    followup = conn.execute(
-        "SELECT * FROM followups WHERE id = ?",
-        (followup_id,)
-    ).fetchone()
-
+    followup = conn.execute("SELECT * FROM followups WHERE id=?", (followup_id,)).fetchone()
     if not followup:
         conn.close()
         return "Follow-up not found"
-
     if request.method == "POST":
-
         name = request.form.get("name", "").strip()
         phone = request.form.get("phone", "").strip()
         follow_up_date = request.form.get("follow_up_date") or None
         note = request.form.get("note", "").strip()
         status = request.form.get("status", "New")
-
-        # Cancel means: remove it from active Follow-ups and store it separately.
         if status == "Cancel":
-            project_id = None
-            project_name = None
-            assigned_to = None
-
+            project_id = project_name = assigned_to = None
             if followup["lead_id"]:
-                lead = conn.execute("""
-                    SELECT leads.*, projects.name AS project_name
-                    FROM leads
-                    LEFT JOIN projects ON leads.project_id = projects.id
-                    WHERE leads.id = ?
-                """, (followup["lead_id"],)).fetchone()
-
+                lead = conn.execute("""SELECT leads.*,projects.name AS project_name
+                    FROM leads LEFT JOIN projects ON leads.project_id=projects.id WHERE leads.id=?""",
+                    (followup["lead_id"],)).fetchone()
                 if lead:
-                    project_id = lead["project_id"]
-                    project_name = lead["project_name"]
-                    assigned_to = lead["assigned_to"]
-
-            conn.execute("""
-                INSERT INTO canceled_leads
-                (lead_id, name, phone, project_id, project_name, assigned_to,
-                 follow_up_date, note, cancelled_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                followup["lead_id"],
-                name or followup["name"],
-                phone or followup["phone"],
-                project_id,
-                project_name,
-                assigned_to,
-                follow_up_date or followup["follow_up_date"],
-                note or followup["note"],
-                date.today().isoformat()
-            ))
-
+                    project_id, project_name, assigned_to = lead["project_id"], lead["project_name"], lead["assigned_to"]
+            conn.execute("""INSERT INTO canceled_leads
+                (lead_id,name,phone,project_id,project_name,assigned_to,follow_up_date,note,cancelled_date)
+                VALUES(?,?,?,?,?,?,?,?,?)""",
+                (followup["lead_id"], name or followup["name"], phone or followup["phone"],
+                 project_id, project_name, assigned_to, follow_up_date or followup["follow_up_date"],
+                 note or followup["note"], date.today().isoformat()))
             if followup["lead_id"]:
-                conn.execute("""
-                    UPDATE leads
-                    SET follow_up_date = NULL
-                    WHERE id = ?
-                """, (followup["lead_id"],))
-
-            conn.execute(
-                "DELETE FROM followups WHERE id = ?",
-                (followup_id,)
-            )
-
+                conn.execute("UPDATE leads SET follow_up_date=NULL WHERE id=?", (followup["lead_id"],))
+            conn.execute("DELETE FROM followups WHERE id=?", (followup_id,))
             conn.commit()
             conn.close()
-
             return redirect("/canceled")
-
-        conn.execute("""
-            UPDATE followups
-            SET name = ?,
-                phone = ?,
-                follow_up_date = ?,
-                note = ?,
-                status = ?
-            WHERE id = ?
-        """, (
-            name,
-            phone,
-            follow_up_date,
-            note,
-            status,
-            followup_id
-        ))
-
+        conn.execute("""UPDATE followups SET name=?,phone=?,follow_up_date=?,note=?,status=? WHERE id=?""",
+                     (name, phone, follow_up_date, note, status, followup_id))
         if followup["lead_id"]:
-            conn.execute("""
-                UPDATE leads
-                SET name = ?,
-                    phone = ?,
-                    follow_up_date = ?,
-                    notes = ?
-                WHERE id = ?
-            """, (
-                name,
-                phone,
-                follow_up_date,
-                note,
-                followup["lead_id"]
-            ))
-
+            conn.execute("""UPDATE leads SET name=?,phone=?,follow_up_date=?,notes=? WHERE id=?""",
+                         (name, phone, follow_up_date, note, followup["lead_id"]))
         conn.commit()
         conn.close()
-
         return redirect("/followups")
-
     conn.close()
-
-    return render_template(
-        "edit_followup.html",
-        followup=followup
-    )
+    return render_template("edit_followup.html", followup=followup)
 
 
 @app.route("/delete-followup/<int:followup_id>", methods=["GET", "POST"])
 def delete_followup(followup_id):
-
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            cloud.delete_followup(followup_id)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return redirect("/followups")
 
     conn = get_db()
-
-    followup = conn.execute(
-        "SELECT lead_id FROM followups WHERE id = ?",
-        (followup_id,)
-    ).fetchone()
-
+    followup = conn.execute("SELECT lead_id FROM followups WHERE id=?", (followup_id,)).fetchone()
     if not followup:
         conn.close()
         return redirect("/followups")
-
-    # Clear the lead's follow-up date too. Otherwise database migration
-    # would recreate the deleted follow-up on the next app start.
     if followup["lead_id"]:
-        conn.execute("""
-            UPDATE leads
-            SET follow_up_date = NULL
-            WHERE id = ?
-        """, (followup["lead_id"],))
-
-    conn.execute(
-        "DELETE FROM followups WHERE id = ?",
-        (followup_id,)
-    )
-
+        conn.execute("UPDATE leads SET follow_up_date=NULL WHERE id=?", (followup["lead_id"],))
+    conn.execute("DELETE FROM followups WHERE id=?", (followup_id,))
     conn.commit()
     conn.close()
-
     return redirect("/followups")
 
 
