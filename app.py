@@ -1712,12 +1712,10 @@ def edit_payment(payment_id):
     cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
     if cloud and cloud.enabled:
         try:
-            customer_id = None
-            for customer in cloud.customers():
-                for p in cloud.get_customer(customer["id"]).get("customer",{}).get("payments",[]):
-                    if p["id"] == payment_id: customer_id = customer["id"]; payment = p; break
-                if customer_id: break
-            if not customer_id: return "Payment not found"
+            payment = cloud.get_payment(payment_id).get("payment")
+            if not payment: return "Payment not found"
+            customer_id = payment.get("customer_id")
+            if not customer_id: return "Payment customer not found"
             if request.method=="POST":
                 cloud.update_payment(payment_id, {"amount": float(request.form.get("amount") or 0),
                     "payment_date": request.form.get("payment_date"), "note": request.form.get("note")})
@@ -1742,12 +1740,10 @@ def delete_payment(payment_id):
     cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
     if cloud and cloud.enabled:
         try:
-            customer_id = None
-            for customer in cloud.customers():
-                detail = cloud.get_customer(customer["id"]).get("customer",{})
-                if any(p["id"] == payment_id for p in detail.get("payments",[])):
-                    customer_id = customer["id"]; break
-            if not customer_id: return "Payment not found"
+            payment = cloud.get_payment(payment_id).get("payment")
+            if not payment: return "Payment not found"
+            customer_id = payment.get("customer_id")
+            if not customer_id: return "Payment customer not found"
             cloud.delete_payment(payment_id)
             return redirect(f"/customer/{customer_id}")
         except CloudAPIError as exc: return "Central CRM error: " + str(exc)
