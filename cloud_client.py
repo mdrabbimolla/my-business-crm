@@ -62,12 +62,6 @@ class CloudCRMClient:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise CloudAPIError("Central CRM API is unreachable") from exc
 
-    def receipt_settings(self):
-        return self._request("GET", "/api/receipt-settings").get("settings", {})
-
-    def update_receipt_settings(self, header_name):
-        return self._request("PUT", "/api/receipt-settings", {"header_name": header_name}).get("settings", {})
-
     def dashboard(self):
         return self._request("GET", "/api/dashboard")
 
