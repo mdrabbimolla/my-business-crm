@@ -21,7 +21,7 @@ class CloudApiTests(unittest.TestCase):
         conn = db()
         for table in (
             "auth_tokens", "lead_notes", "followups", "canceled_leads",
-            "payments", "expenses", "leads", "customers", "projects", "users", "project_files",
+            "payments", "expenses", "leads", "customers", "projects", "users", "project_files", "receipt_settings",
         ):
             conn.execute(f"DELETE FROM {table}")
         conn.commit()
@@ -487,6 +487,53 @@ class CloudApiTests(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 
+
+    def test_receipt_settings_are_central_and_role_protected(self):
+        admin_bootstrap = self.client.post(
+            "/api/bootstrap-user",
+            json={"username":"receipt-admin","password":"pass-123","name":"Receipt Admin","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"},
+        )
+        self.assertEqual(admin_bootstrap.status_code, 201)
+        sales_bootstrap = self.client.post(
+            "/api/bootstrap-user",
+            json={"username":"receipt-sales","password":"pass-123","name":"Receipt Sales","role":"Sales"},
+            headers={"X-CRM-API-SECRET":"test-secret"},
+        )
+        self.assertEqual(sales_bootstrap.status_code, 201)
+
+        admin_token = self.client.post(
+            "/api/login", json={"username":"receipt-admin","password":"pass-123"}
+        ).json["token"]
+        sales_token = self.client.post(
+            "/api/login", json={"username":"receipt-sales","password":"pass-123"}
+        ).json["token"]
+
+        admin_headers = {"Authorization": f"Bearer {admin_token}"}
+        sales_headers = {"Authorization": f"Bearer {sales_token}"}
+
+        initial = self.client.get("/api/receipt-settings", headers=sales_headers)
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.json["settings"]["header_name"], "ARKAM MC PARK")
+
+        updated = self.client.put(
+            "/api/receipt-settings",
+            json={"header_name":"SWADESH BANGLA PROPERTY"},
+            headers=admin_headers,
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json["settings"]["header_name"], "SWADESH BANGLA PROPERTY")
+
+        shared = self.client.get("/api/receipt-settings", headers=sales_headers)
+        self.assertEqual(shared.status_code, 200)
+        self.assertEqual(shared.json["settings"]["header_name"], "SWADESH BANGLA PROPERTY")
+
+        denied = self.client.put(
+            "/api/receipt-settings",
+            json={"header_name":"Unauthorized Change"},
+            headers=sales_headers,
+        )
+        self.assertEqual(denied.status_code, 403)
 
     def test_user_management_is_central(self):
         self._bootstrap("admin2", "adminpass", "Admin")
