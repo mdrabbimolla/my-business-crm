@@ -13,28 +13,47 @@ def db():
     path = os.environ.get("CRM_CLOUD_DB", os.path.join(os.path.dirname(__file__), "cloud.db"))
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def init_cloud_db():
     conn = db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            name TEXT,
-            role TEXT NOT NULL DEFAULT 'Sales',
-            active INTEGER NOT NULL DEFAULT 1,
-            created_at TEXT NOT NULL
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS auth_tokens (
-            token TEXT PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            created_at TEXT NOT NULL,
-            FOREIGN KEY(user_id) REFERENCES users(id)
-        )
+    conn.executescript("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL, name TEXT, role TEXT NOT NULL DEFAULT 'Sales',
+        active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS auth_tokens (
+        token TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS projects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+        location TEXT, status TEXT NOT NULL DEFAULT 'Active', notes TEXT, created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS leads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT NOT NULL UNIQUE,
+        project_id INTEGER, notes TEXT, follow_up_date TEXT, status TEXT NOT NULL DEFAULT 'New',
+        created_by TEXT, assigned_to TEXT, visit_date TEXT, visit_time TEXT,
+        visit_status TEXT DEFAULT 'Planned', visit_completed_date TEXT, created_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id)
+    );
+    CREATE TABLE IF NOT EXISTS customers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT,
+        address TEXT, business TEXT, notes TEXT, follow_up TEXT,
+        sales REAL NOT NULL DEFAULT 0, paid REAL NOT NULL DEFAULT 0,
+        project_id INTEGER, created_at TEXT NOT NULL,
+        FOREIGN KEY(project_id) REFERENCES projects(id)
+    );
+    CREATE TABLE IF NOT EXISTS followups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, lead_id INTEGER, name TEXT, phone TEXT,
+        follow_up_date TEXT, note TEXT, status TEXT DEFAULT 'New', created_at TEXT NOT NULL,
+        FOREIGN KEY(lead_id) REFERENCES leads(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cloud_leads_project ON leads(project_id);
+    CREATE INDEX IF NOT EXISTS idx_cloud_customers_project ON customers(project_id);
+    CREATE INDEX IF NOT EXISTS idx_cloud_followups_date ON followups(follow_up_date);
     """)
     conn.commit()
     conn.close()
@@ -44,8 +63,7 @@ def require_api_secret(fn):
     def wrapper(*args, **kwargs):
         if not API_SECRET:
             return jsonify(error="CRM_API_SECRET is not configured"), 503
-        supplied = request.headers.get("X-CRM-API-SECRET", "")
-        if not secrets.compare_digest(supplied, API_SECRET):
+        if not secrets.compare_digest(request.headers.get("X-CRM-API-SECRET", ""), API_SECRET):
             return jsonify(error="Unauthorized"), 401
         return fn(*args, **kwargs)
     return wrapper
@@ -56,14 +74,11 @@ def require_token(fn):
         header = request.headers.get("Authorization", "")
         if not header.startswith("Bearer "):
             return jsonify(error="Authentication required"), 401
-        token = header[7:].strip()
         conn = db()
-        user = conn.execute("""
-            SELECT users.*
-            FROM auth_tokens
+        user = conn.execute("""SELECT users.* FROM auth_tokens
             JOIN users ON users.id = auth_tokens.user_id
-            WHERE auth_tokens.token = ? AND users.active = 1
-        """, (token,)).fetchone()
+            WHERE auth_tokens.token = ? AND users.active = 1""",
+            (header[7:].strip(),)).fetchone()
         conn.close()
         if not user:
             return jsonify(error="Invalid or expired session"), 401
@@ -73,29 +88,26 @@ def require_token(fn):
 
 @app.get("/api/health")
 def health():
+    init_cloud_db()
     return jsonify(ok=True, service="my-business-crm-central-api")
 
 @app.post("/api/bootstrap-user")
 @require_api_secret
 def bootstrap_user():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
-    name = (data.get("name") or "").strip()
-    role = (data.get("role") or "Sales").strip()
+    username, password = (data.get("username") or "").strip(), data.get("password") or ""
+    name, role = (data.get("name") or "").strip(), (data.get("role") or "Sales").strip()
     if not username or not password:
         return jsonify(error="username and password are required"), 400
     if role not in {"Admin", "Manager", "Sales"}:
         return jsonify(error="invalid role"), 400
     conn = db()
-    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
-    if existing:
+    if conn.execute("SELECT id FROM users WHERE username=?", (username,)).fetchone():
         conn.close()
         return jsonify(error="username already exists"), 409
-    cur = conn.execute("""
-        INSERT INTO users(username, password_hash, name, role, active, created_at)
-        VALUES (?, ?, ?, ?, 1, ?)
-    """, (username, generate_password_hash(password), name, role, datetime.now(timezone.utc).isoformat()))
+    cur = conn.execute("""INSERT INTO users(username,password_hash,name,role,active,created_at)
+        VALUES (?,?,?,?,1,?)""",
+        (username, generate_password_hash(password), name, role, datetime.now(timezone.utc).isoformat()))
     conn.commit()
     user_id = cur.lastrowid
     conn.close()
@@ -104,31 +116,102 @@ def bootstrap_user():
 @app.post("/api/login")
 def api_login():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
+    username, password = (data.get("username") or "").strip(), data.get("password") or ""
     conn = db()
-    user = conn.execute("SELECT * FROM users WHERE username = ? AND active = 1", (username,)).fetchone()
+    user = conn.execute("SELECT * FROM users WHERE username=? AND active=1", (username,)).fetchone()
     if not user or not check_password_hash(user["password_hash"], password):
         conn.close()
         return jsonify(error="Wrong username or password"), 401
     token = secrets.token_urlsafe(32)
-    conn.execute(
-        "INSERT INTO auth_tokens(token, user_id, created_at) VALUES (?, ?, ?)",
-        (token, user["id"], datetime.now(timezone.utc).isoformat()),
-    )
+    conn.execute("INSERT INTO auth_tokens(token,user_id,created_at) VALUES (?,?,?)",
+                 (token, user["id"], datetime.now(timezone.utc).isoformat()))
     conn.commit()
     conn.close()
     return jsonify(ok=True, token=token, user={
-        "id": user["id"], "username": user["username"], "name": user["name"], "role": user["role"]
-    })
+        "id":user["id"],"username":user["username"],"name":user["name"],"role":user["role"]})
 
 @app.get("/api/me")
 @require_token
 def me():
-    return jsonify(ok=True, user={
-        "id": g.user["id"], "username": g.user["username"], "name": g.user["name"], "role": g.user["role"]
-    })
+    return jsonify(ok=True, user={"id":g.user["id"],"username":g.user["username"],
+                                  "name":g.user["name"],"role":g.user["role"]})
+
+@app.get("/api/projects")
+@require_token
+def list_projects():
+    conn = db()
+    rows = conn.execute("SELECT * FROM projects WHERE status='Active' ORDER BY name").fetchall()
+    conn.close()
+    return jsonify(projects=[dict(r) for r in rows])
+
+@app.post("/api/projects")
+@require_token
+def create_project():
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify(error="project name is required"), 400
+    conn = db()
+    try:
+        cur = conn.execute("""INSERT INTO projects(name,location,status,notes,created_at)
+            VALUES (?,?,?,?,?)""",
+            (name,data.get("location"),data.get("status") or "Active",data.get("notes"),
+             datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        row = conn.execute("SELECT * FROM projects WHERE id=?", (cur.lastrowid,)).fetchone()
+        return jsonify(project=dict(row)), 201
+    except sqlite3.IntegrityError:
+        return jsonify(error="project already exists"), 409
+    finally:
+        conn.close()
+
+@app.get("/api/leads")
+@require_token
+def list_leads():
+    conn = db()
+    if g.user["role"] == "Sales":
+        rows = conn.execute("SELECT * FROM leads WHERE assigned_to=? ORDER BY id DESC",
+                            (g.user["username"],)).fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM leads ORDER BY id DESC").fetchall()
+    conn.close()
+    return jsonify(leads=[dict(r) for r in rows])
+
+@app.post("/api/leads")
+@require_token
+def create_lead():
+    data = request.get_json(silent=True) or {}
+    phone = (data.get("phone") or "").strip()
+    if not phone:
+        return jsonify(error="phone number is required"), 400
+    conn = db()
+    duplicate = conn.execute("SELECT id,name FROM leads WHERE phone=?", (phone,)).fetchone()
+    customer_duplicate = conn.execute("SELECT id,name FROM customers WHERE phone=?", (phone,)).fetchone()
+    if duplicate or customer_duplicate:
+        conn.close()
+        return jsonify(error="phone number already exists",
+                       lead_id=duplicate["id"] if duplicate else None,
+                       customer_id=customer_duplicate["id"] if customer_duplicate else None), 409
+    now = datetime.now(timezone.utc).isoformat()
+    cur = conn.execute("""INSERT INTO leads
+        (name,phone,project_id,notes,follow_up_date,status,created_by,assigned_to,visit_date,visit_time,created_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (data.get("name"),phone,data.get("project_id"),data.get("notes"),data.get("follow_up_date"),
+         data.get("status") or "New",g.user["username"],data.get("assigned_to") or g.user["username"],
+         data.get("visit_date"),data.get("visit_time"),now))
+    conn.commit()
+    row = conn.execute("SELECT * FROM leads WHERE id=?", (cur.lastrowid,)).fetchone()
+    conn.close()
+    return jsonify(lead=dict(row)), 201
+
+@app.get("/api/customers")
+@require_token
+def list_customers():
+    conn = db()
+    rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
+    conn.close()
+    return jsonify(customers=[dict(r) for r in rows])
 
 if __name__ == "__main__":
     init_cloud_db()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8000")))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT","8000")))
