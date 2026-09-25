@@ -39,6 +39,7 @@ def test_login_page_and_local_login():
         response = client.get("/dashboard")
         assert response.status_code == 200
 
+        print("ROUTES:", sorted(rule.rule for rule in app_module.app.url_map.iter_rules()))
         response = client.get("/users")
         assert response.status_code == 200
         assert b"CRM Users" in response.data
