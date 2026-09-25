@@ -191,6 +191,66 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(view.json["customer"]["paid"], 25000)
         self.assertEqual(view.json["customer"]["due"], 75000)
 
+    def test_customer_payment_crud_and_filters_are_central(self):
+        response = self.client.post("/api/bootstrap-user",
+            json={"username":"customer-crud","password":"pass-123","name":"Customer CRUD","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        self.assertEqual(response.status_code, 201)
+        login = self.client.post("/api/login", json={"username":"customer-crud","password":"pass-123"})
+        token = login.json["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        project = self.client.post("/api/projects", json={"name":"Customer Filter Project"}, headers=headers)
+        self.assertEqual(project.status_code, 201)
+        project_id = project.json["project"]["id"]
+
+        customer = self.client.post("/api/customers", json={
+            "name":"Central Customer","phone":"01811111111","sales":200000,
+            "paid":10000,"project_id":project_id
+        }, headers=headers)
+        self.assertEqual(customer.status_code, 201)
+        customer_id = customer.json["customer"]["id"]
+
+        filtered = self.client.get(
+            f"/api/customers?search=Central&filter=due&project_id={project_id}",
+            headers=headers)
+        self.assertEqual(filtered.status_code, 200)
+        self.assertEqual(len(filtered.json["customers"]), 1)
+        self.assertEqual(filtered.json["customers"][0]["project_name"], "Customer Filter Project")
+        self.assertEqual(filtered.json["customers"][0]["due"], 190000)
+
+        payment = self.client.post(f"/api/customers/{customer_id}/payments",
+            json={"amount":25000,"payment_date":"2026-09-25","note":"Initial"},
+            headers=headers)
+        self.assertEqual(payment.status_code, 201)
+        payment_id = payment.json["payment"]["id"]
+
+        updated_payment = self.client.put(f"/api/payments/{payment_id}",
+            json={"amount":30000,"payment_date":"2026-09-26","note":"Updated"},
+            headers=headers)
+        self.assertEqual(updated_payment.status_code, 200)
+
+        detail = self.client.get(f"/api/customers/{customer_id}", headers=headers)
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json["customer"]["paid"], 40000)
+        self.assertEqual(detail.json["customer"]["due"], 160000)
+
+        updated_customer = self.client.put(f"/api/customers/{customer_id}",
+            json={"name":"Central Customer Updated","phone":"01811111111","sales":250000,
+                  "paid":40000,"project_id":project_id},
+            headers=headers)
+        self.assertEqual(updated_customer.status_code, 200)
+        self.assertEqual(updated_customer.json["customer"]["name"], "Central Customer Updated")
+
+        deleted_payment = self.client.delete(f"/api/payments/{payment_id}", headers=headers)
+        self.assertEqual(deleted_payment.status_code, 200)
+        detail_after_payment = self.client.get(f"/api/customers/{customer_id}", headers=headers)
+        self.assertEqual(detail_after_payment.json["customer"]["paid"], 10000)
+
+        deleted_customer = self.client.delete(f"/api/customers/{customer_id}", headers=headers)
+        self.assertEqual(deleted_customer.status_code, 200)
+        self.assertEqual(self.client.get(f"/api/customers/{customer_id}", headers=headers).status_code, 404)
+
     def test_core_unauthorized_access_is_blocked(self):
         self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
         self.assertEqual(self.client.get("/api/expenses").status_code, 401)
