@@ -46,6 +46,10 @@ app = Flask(__name__)
 
 app.secret_key = "mycrm-secret-key"
 
+def _https_context():
+    """Create the HTTPS context used by update checks and cloud requests."""
+    return ssl.create_default_context()
+
 
 init_db()
 
@@ -627,7 +631,7 @@ def login():
         <a href="/">Try Again</a>
         """
 
-        return """
+    return """
 <!DOCTYPE html>
 <html lang="en">
 <head>
