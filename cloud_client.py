@@ -141,6 +141,26 @@ class CloudCRMClient:
             payload["note_date"] = note_date
         return self._request("POST", f"/api/leads/{int(lead_id)}/notes", payload)
 
+    def lead_notes(self, lead_id):
+        return self._request("GET", f"/api/lead-notes/{int(lead_id)}")
+    
+    def create_lead_note(self, lead_id, data):
+        return self._request("POST", f"/api/lead-notes/{int(lead_id)}", data)
+    
+    def reassign_lead(self, lead_id, assigned_to):
+        return self._request("PUT", f"/api/leads/{int(lead_id)}/reassign", {"assigned_to": assigned_to})
+    
+    def daily_report(self, params=None):
+        path="/api/reports/daily"
+        if params:
+            from urllib.parse import urlencode
+            clean={k:v for k,v in params.items() if v not in (None,"")}
+            if clean: path += "?" + urlencode(clean)
+        return self._request("GET", path)
+    
+    def monthly_report(self):
+        return self._request("GET", "/api/reports/monthly")
+
     def followups(self):
         return self._request("GET", "/api/followups").get("followups", [])
 
