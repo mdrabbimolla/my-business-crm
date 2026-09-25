@@ -141,9 +141,32 @@ def register_core_routes(app, db, require_token):
                                        FROM customers LEFT JOIN projects ON projects.id=customers.project_id
                                        WHERE customers.id=?""", (customer_id,)).fetchone()
         if not row: conn.close(); return jsonify(error="customer not found"),404
-        payments=conn.execute("SELECT * FROM payments WHERE customer_id=? ORDER BY id DESC",(customer_id,)).fetchall()
-        conn.close(); out=dict(row); out["due"]=(row["sales"] or 0)-(row["paid"] or 0); out["payments"]=[dict(x) for x in payments]
+        payments=conn.execute("SELECT * FROM payments WHERE customer_id=? ORDER BY id ASC",(customer_id,)).fetchall()
+        sales=float(row["sales"] or 0)
+        running_due=sales
+        payment_list=[]
+        for payment in payments:
+            running_due -= float(payment["amount"] or 0)
+            item=dict(payment)
+            item["due_after_payment"]=running_due
+            payment_list.append(item)
+        payment_list.reverse()
+        conn.close()
+        out=dict(row)
+        out["due"]=sales-float(row["paid"] or 0)
+        out["payments"]=payment_list
         return jsonify(customer=out)
+
+    @api.get("/api/payments/<int:payment_id>")
+    @require_token
+    def get_payment(payment_id):
+        conn=db()
+        row=conn.execute("SELECT * FROM payments WHERE id=?", (payment_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="payment not found"),404
+        conn.close()
+        return jsonify(payment=dict(row))
 
     @api.post("/api/customers")
     @require_token
