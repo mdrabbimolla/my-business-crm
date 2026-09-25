@@ -170,6 +170,12 @@ class CloudCRMClient:
     def create_expense(self, data):
         return self._request("POST", "/api/expenses", data)
 
+    def update_expense(self, expense_id, data):
+        return self._request("PUT", f"/api/expenses/{int(expense_id)}", data)
+
+    def delete_expense(self, expense_id):
+        return self._request("DELETE", f"/api/expenses/{int(expense_id)}")
+
 
 def _https_context():
     # Keep certificate verification enabled for production HTTPS.
