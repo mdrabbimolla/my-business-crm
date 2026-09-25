@@ -16,6 +16,16 @@ class CloudApiTests(unittest.TestCase):
 
     def setUp(self):
         self.client = app.test_client()
+        # Isolate tests: all tests share one temporary central DB file.
+        from cloud_api import db
+        conn = db()
+        for table in (
+            "auth_tokens", "lead_notes", "followups", "canceled_leads",
+            "payments", "expenses", "leads", "customers", "projects", "users",
+        ):
+            conn.execute(f"DELETE FROM {table}")
+        conn.commit()
+        conn.close()
 
     def test_health(self):
         response = self.client.get("/api/health")
