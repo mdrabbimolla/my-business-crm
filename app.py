@@ -2665,655 +2665,78 @@ def delete_canceled(canceled_id):
 
 @app.route("/daily-report")
 def daily_report():
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    report_date = request.args.get("date") or date.today().isoformat()
-    project_filter = request.args.get("project_id", "").strip()
-
-    conn = get_db()
-
-    current_user = conn.execute("""
-        SELECT *
-        FROM users
-        WHERE username = ? AND active = 1
-    """, (session.get("username"),)).fetchone()
-
-    if not current_user:
-        conn.close()
-        return "User not found"
-
-    projects = conn.execute("""
-        SELECT id, name
-        FROM projects
-        WHERE status = 'Active'
-        ORDER BY name
-    """).fetchall()
-
-    params = [report_date, report_date]
-    query = """
-        SELECT
-            leads.id,
-            leads.name,
-            leads.phone,
-            leads.project_id,
-            leads.created_at,
-            leads.follow_up_date,
-            leads.visit_date,
-            leads.visit_time,
-            leads.visit_status,
-            leads.visit_completed_date,
-            projects.name AS project_name,
-            ln.note,
-            ln.note_date,
-            (SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id = ln.lead_id AND z.id < ln.id) AS previous_note_count
-        FROM lead_notes ln
-        JOIN leads ON leads.id = ln.lead_id
-        LEFT JOIN projects ON projects.id = leads.project_id
-        WHERE ln.note_date = ?
-          AND ln.id = (
-              SELECT MAX(ln2.id)
-              FROM lead_notes ln2
-              WHERE ln2.lead_id = ln.lead_id
-                AND ln2.note_date = ?
-          )
-    """
-
-    if project_filter:
-        query += " AND leads.project_id = ?"
-        params.append(project_filter)
-
-    if current_user["role"] == "Sales":
-        query += " AND leads.assigned_to = ?"
-        params.append(current_user["username"])
-
-    query += " ORDER BY projects.name ASC, leads.id DESC"
-
-    talked_leads = conn.execute(query, params).fetchall()
-
-    visit_params = [report_date]
-    visit_query = """
-        SELECT COUNT(*)
-        FROM leads
-        WHERE visit_date = ?
-          AND visit_date IS NOT NULL
-    """
-    if project_filter:
-        visit_query += " AND project_id = ?"
-        visit_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        visit_query += " AND assigned_to = ?"
-        visit_params.append(current_user["username"])
-    visits_scheduled = conn.execute(visit_query, visit_params).fetchone()[0]
-
-    completed_params = [report_date]
-    completed_query = """
-        SELECT COUNT(*)
-        FROM leads
-        WHERE visit_status = 'Completed'
-          AND visit_completed_date = ?
-    """
-    if project_filter:
-        completed_query += " AND project_id = ?"
-        completed_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        completed_query += " AND assigned_to = ?"
-        completed_params.append(current_user["username"])
-    visits_completed = conn.execute(completed_query, completed_params).fetchone()[0]
-
-    cancelled_params = [report_date]
-    cancelled_query = """
-        SELECT COUNT(*)
-        FROM canceled_leads
-        WHERE cancelled_date = ?
-    """
-    if project_filter:
-        cancelled_query += " AND project_id = ?"
-        cancelled_params.append(project_filter)
-    if current_user["role"] == "Sales":
-        cancelled_query += " AND assigned_to = ?"
-        cancelled_params.append(current_user["username"])
-    cancelled_count = conn.execute(cancelled_query, cancelled_params).fetchone()[0]
-
-    new_leads_count = sum(
-        1 for lead in talked_leads
-        if (lead["created_at"] or "")[:10] == report_date
-        and (lead["previous_note_count"] or 0) == 0
-    )
-    followup_leads_count = sum(
-        1 for lead in talked_leads
-        if lead["follow_up_date"] == report_date
-        and (lead["previous_note_count"] or 0) > 0
-    )
-    conn.close()
-
-    return render_template(
-        "daily_report.html",
-        report_date=report_date,
-        project_filter=project_filter,
-        projects=projects,
-        talked_leads=talked_leads,
-        talked_count=len(talked_leads),
-        new_leads_count=new_leads_count,
-        followup_leads_count=followup_leads_count,
-        visits_scheduled=visits_scheduled,
-        visits_completed=visits_completed,
-        cancelled_count=cancelled_count
-    )
-
+    if not session.get("logged_in"): return redirect("/")
+    report_date=request.args.get("date") or date.today().isoformat(); project_filter=request.args.get("project_id","").strip()
+    cloud=_cloud_client(session.get("cloud_token")) if session.get("auth_mode")=="cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            report=cloud.daily_report({"date":report_date,"project_id":project_filter})
+            return render_template("daily_report.html",report_date=report.get("report_date"),project_filter=project_filter,
+                projects=report.get("projects",[]),talked_leads=report.get("talked_leads",[]),talked_count=report.get("talked_count",0),
+                new_leads_count=report.get("new_leads_count",0),followup_leads_count=report.get("followup_leads_count",0),
+                visits_scheduled=report.get("visits_scheduled",0),visits_completed=report.get("visits_completed",0),cancelled_count=report.get("cancelled_count",0))
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); current_user=conn.execute("SELECT * FROM users WHERE username=? AND active=1",(session.get("username"),)).fetchone()
+    if not current_user: conn.close(); return "User not found"
+    projects=conn.execute("SELECT id,name FROM projects WHERE status='Active' ORDER BY name").fetchall()
+    params=[report_date,report_date]; query="""SELECT leads.id,leads.name,leads.phone,leads.project_id,leads.created_at,leads.follow_up_date,leads.visit_date,leads.visit_time,leads.visit_status,leads.visit_completed_date,projects.name AS project_name,ln.note,ln.note_date,(SELECT COUNT(*) FROM lead_notes z WHERE z.lead_id=ln.lead_id AND z.id<ln.id) AS previous_note_count FROM lead_notes ln JOIN leads ON leads.id=ln.lead_id LEFT JOIN projects ON projects.id=leads.project_id WHERE ln.note_date=? AND ln.id=(SELECT MAX(ln2.id) FROM lead_notes ln2 WHERE ln2.lead_id=ln.lead_id AND ln2.note_date=?)"""
+    if project_filter: query+=" AND leads.project_id=?"; params.append(project_filter)
+    if current_user["role"]=="Sales": query+=" AND leads.assigned_to=?"; params.append(current_user["username"])
+    talked=conn.execute(query+" ORDER BY projects.name ASC,leads.id DESC",params).fetchall()
+    conn.close(); return render_template("daily_report.html",report_date=report_date,project_filter=project_filter,projects=projects,talked_leads=talked,talked_count=len(talked),new_leads_count=0,followup_leads_count=0,visits_scheduled=0,visits_completed=0,cancelled_count=0)
 
 @app.route("/monthly-report")
 def monthly_report():
+    if not session.get("logged_in"): return redirect("/")
+    cloud=_cloud_client(session.get("cloud_token")) if session.get("auth_mode")=="cloud" else None
+    if cloud and cloud.enabled:
+        try: return render_template("monthly_report.html",monthly_report=cloud.monthly_report().get("monthly_report",[]))
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); rows=conn.execute("""SELECT month,SUM(sales) sales,SUM(payments) payments,SUM(expenses) expenses FROM
+      (SELECT strftime('%Y-%m',created_at) month,sales,0 payments,0 expenses FROM customers
+       UNION ALL SELECT strftime('%Y-%m',payment_date),0,amount,0 FROM payments WHERE payment_date IS NOT NULL
+       UNION ALL SELECT strftime('%Y-%m',expense_date),0,0,amount FROM expenses WHERE expense_date IS NOT NULL)
+      WHERE month IS NOT NULL GROUP BY month ORDER BY month DESC""").fetchall(); conn.close()
+    return render_template("monthly_report.html",monthly_report=rows)
 
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    monthly_report = conn.execute("""
-        SELECT
-            month,
-            SUM(sales) AS sales,
-            SUM(payments) AS payments,
-            SUM(expenses) AS expenses
-        FROM (
-
-            SELECT
-                strftime('%Y-%m', created_at) AS month,
-                sales,
-                0 AS payments,
-                0 AS expenses
-            FROM customers
-
-            UNION ALL
-
-            SELECT
-                strftime('%Y-%m', payment_date) AS month,
-                0 AS sales,
-                amount AS payments,
-                0 AS expenses
-            FROM payments
-            WHERE payment_date IS NOT NULL
-
-            UNION ALL
-
-            SELECT
-                strftime('%Y-%m', expense_date) AS month,
-                0 AS sales,
-                0 AS payments,
-                amount AS expenses
-            FROM expenses
-            WHERE expense_date IS NOT NULL
-
-        )
-        WHERE month IS NOT NULL
-        GROUP BY month
-        ORDER BY month DESC
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "monthly_report.html",
-        monthly_report=monthly_report
-    )
 @app.route("/lead-notes/<int:lead_id>")
 def lead_notes(lead_id):
+    if not session.get("logged_in"): return redirect("/")
+    cloud=_cloud_client(session.get("cloud_token")) if session.get("auth_mode")=="cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            data=cloud.lead_notes(lead_id)
+            return render_template("lead_notes.html",lead=data.get("lead"),notes=data.get("notes",[]))
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); lead=conn.execute("SELECT * FROM leads WHERE id=?",(lead_id,)).fetchone()
+    if not lead: conn.close(); return "Lead not found"
+    notes=conn.execute("SELECT * FROM lead_notes WHERE lead_id=? ORDER BY id DESC",(lead_id,)).fetchall(); conn.close()
+    return render_template("lead_notes.html",lead=lead,notes=notes)
 
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-    lead = conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
-
-    if not lead:
-        conn.close()
-        return "Lead not found"
-
-    notes = conn.execute("""
-        SELECT *
-        FROM lead_notes
-        WHERE lead_id = ?
-        ORDER BY id DESC
-    """, (lead_id,)).fetchall()
-
-    conn.close()
-
-    return render_template("lead_notes.html", lead=lead, notes=notes)
-
-
-@app.route("/reassign-lead/<int:lead_id>", methods=["GET", "POST"])
+@app.route("/reassign-lead/<int:lead_id>", methods=["GET","POST"])
 def reassign_lead(lead_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    current_user = conn.execute("""
-        SELECT *
-        FROM users
-        WHERE username = ?
-    """, (session.get("username"),)).fetchone()
-
-    if not current_user or current_user["role"] not in ["Admin", "Manager"]:
-        conn.close()
-        return "Access Denied"
-
-    lead = conn.execute("""
-        SELECT
-            leads.*,
-            projects.name AS project_name,
-            users.name AS assigned_user_name
-        FROM leads
-        LEFT JOIN projects
-            ON leads.project_id = projects.id
-        LEFT JOIN users
-            ON leads.assigned_to = users.username
-        WHERE leads.id = ?
-    """, (lead_id,)).fetchone()
-
-    if not lead:
-        conn.close()
-        return "Lead not found"
-
-    sales_users = conn.execute("""
-        SELECT *
-        FROM users
-        WHERE active = 1
-        AND role = 'Sales'
-        ORDER BY name, username
-    """).fetchall()
-
-    if request.method == "POST":
-
-        assigned_to = request.form.get("assigned_to") or None
-
-        conn.execute("""
-            UPDATE leads
-            SET assigned_to = ?
-            WHERE id = ?
-        """, (assigned_to, lead_id))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/leads")
-
-    conn.close()
-
-    return render_template(
-        "reassign_lead.html",
-        lead=lead,
-        sales_users=sales_users
-    )
-def _https_context():
-    """Create a verified HTTPS context using the bundled CA certificate store."""
-    try:
-        import certifi
-        return ssl.create_default_context(cafile=certifi.where())
-    except Exception as exc:
-        print("CERTIFI CONTEXT ERROR:", repr(exc))
-        return ssl.create_default_context()
-
-
-REMOTE_REPO = "mdrabbimolla/my-business-crm"
-REMOTE_BRANCH = "main"
-def _runtime_root_dir():
-    # Android may expose HOME as /data, which is not writable by the app.
-    # Store runtime update files inside the app-private files directory instead.
-    if autoclass is not None:
+    if not session.get("logged_in"): return redirect("/")
+    cloud=_cloud_client(session.get("cloud_token")) if session.get("auth_mode")=="cloud" else None
+    if cloud and cloud.enabled:
         try:
-            PythonActivity = autoclass("org.kivy.android.PythonActivity")
-            activity = cast("android.app.Activity", PythonActivity.mActivity)
-            return os.path.join(activity.getFilesDir().getAbsolutePath(), ".mycrm_runtime")
-        except Exception as exc:
-            print("ANDROID RUNTIME DIR ERROR:", repr(exc))
-    return os.path.join(os.path.expanduser("~"), ".mycrm_runtime")
-
-RUNTIME_TEMPLATE_DIR = os.path.join(_runtime_root_dir(), "templates")
-RUNTIME_VERSION_FILE = os.path.join(_runtime_root_dir(), "version.txt")
-
-
-def _remote_update_info():
-    url = f"https://api.github.com/repos/{REMOTE_REPO}/branches/{REMOTE_BRANCH}"
-    request = urllib.request.Request(url, headers={"User-Agent": "My-Business-CRM-Updater", "Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(request, timeout=5, context=_https_context()) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    return payload["commit"]["sha"]
-
-
-def _sync_remote_templates(force=False):
-    try:
-        remote_sha = _remote_update_info()
-        local_sha = ""
-        if os.path.exists(RUNTIME_VERSION_FILE):
-            with open(RUNTIME_VERSION_FILE, "r", encoding="utf-8") as f:
-                local_sha = f.read().strip()
-        if not force and local_sha == remote_sha and os.path.isdir(RUNTIME_TEMPLATE_DIR):
-            return {"ok": True, "updated": False, "sha": remote_sha, "message": "Already up to date"}
-
-        zip_url = f"https://codeload.github.com/{REMOTE_REPO}/zip/{remote_sha}"
-        request = urllib.request.Request(zip_url, headers={"User-Agent": "My-Business-CRM-Updater"})
-        with urllib.request.urlopen(request, timeout=20, context=_https_context()) as response:
-            archive = response.read()
-
-        runtime_root = os.path.dirname(RUNTIME_TEMPLATE_DIR)
-        os.makedirs(runtime_root, exist_ok=True)
-        staging_root = tempfile.mkdtemp(prefix="mycrm_update_", dir=runtime_root)
-        try:
-            archive_path = os.path.join(staging_root, "repo.zip")
-            with open(archive_path, "wb") as f:
-                f.write(archive)
-            extract_root = os.path.join(staging_root, "extract")
-            os.makedirs(extract_root, exist_ok=True)
-            with zipfile.ZipFile(archive_path, "r") as zf:
-                zf.extractall(extract_root)
-            top_dirs = [os.path.join(extract_root, name) for name in os.listdir(extract_root)]
-            repo_root = next((p for p in top_dirs if os.path.isdir(p)), None)
-            source_templates = os.path.join(repo_root, "templates") if repo_root else None
-            if not source_templates or not os.path.isdir(source_templates):
-                raise RuntimeError("Remote templates folder was not found")
-
-            new_templates = os.path.join(staging_root, "templates")
-            shutil.copytree(source_templates, new_templates)
-            old_templates = RUNTIME_TEMPLATE_DIR + ".old"
-            if os.path.exists(old_templates):
-                shutil.rmtree(old_templates, ignore_errors=True)
-            if os.path.exists(RUNTIME_TEMPLATE_DIR):
-                os.replace(RUNTIME_TEMPLATE_DIR, old_templates)
-            os.replace(new_templates, RUNTIME_TEMPLATE_DIR)
-            shutil.rmtree(old_templates, ignore_errors=True)
-            with open(RUNTIME_VERSION_FILE, "w", encoding="utf-8") as f:
-                f.write(remote_sha)
-        finally:
-            shutil.rmtree(staging_root, ignore_errors=True)
-
-        app.template_folder = RUNTIME_TEMPLATE_DIR
-        app.jinja_loader = app.jinja_env.loader = app.create_global_jinja_loader()
-        return {"ok": True, "updated": True, "sha": remote_sha, "message": "CRM UI updated successfully"}
-    except Exception as exc:
-        print("REMOTE UPDATE ERROR:", repr(exc))
-        return {"ok": False, "updated": False, "message": str(exc) or "Update could not be completed"}
-
-
-
-_android_pdf_reports = {}
-_android_pdf_status = {}
-
-
-def save_android_pdf_file(file_path):
-    """Publish a generated PDF to the public Downloads/My Business CRM/Reports folder."""
-    if autoclass is None or cast is None or not os.path.exists(file_path):
-        return False, "Android bridge or generated PDF file is unavailable"
-
-    uri = None
-    try:
-        ContentValues = autoclass("android.content.ContentValues")
-        MediaStoreDownloads = autoclass("android.provider.MediaStore$Downloads")
-        Environment = autoclass("android.os.Environment")
-        PythonActivity = autoclass("org.kivy.android.PythonActivity")
-
-        activity = cast("android.app.Activity", PythonActivity.mActivity)
-        resolver = activity.getContentResolver()
-
-        values = ContentValues()
-        values.put("display_name", os.path.basename(file_path))
-        values.put("mime_type", "application/pdf")
-        values.put("relative_path", Environment.DIRECTORY_DOWNLOADS + "/My Business CRM/Reports")
-        # Follow Android's documented MediaStore flow:
-        # create as pending -> write -> publish by setting IS_PENDING to 0.
-        values.put("is_pending", 1)
-
-        downloads_uri = MediaStoreDownloads.getContentUri("external")
-        uri = resolver.insert(downloads_uri, values)
-        if uri is None:
-            return False, "MediaStore could not create the Downloads entry"
-
-        pfd = resolver.openFileDescriptor(uri, "w", None)
-        if pfd is None:
-            raise RuntimeError("MediaStore could not open the PDF for writing")
-
-        try:
-            # Use ParcelFileDescriptor.getFd() + a duplicated native fd.
-            # This avoids PyJNIus byte[]/OutputStream overload issues.
-            native_fd = int(pfd.getFd())
-            with os.fdopen(os.dup(native_fd), "wb", closefd=True) as target:
-                with open(file_path, "rb") as source:
-                    shutil.copyfileobj(source, target, length=64 * 1024)
-                target.flush()
-                os.fsync(target.fileno())
-        finally:
-            pfd.close()
-
-        publish_values = ContentValues()
-        publish_values.put("is_pending", 0)
-        updated = resolver.update(uri, publish_values, None, None)
-        if updated <= 0:
-            raise RuntimeError("MediaStore could not publish the PDF")
-
-        return True, "PDF published successfully"
-
-    except Exception as exc:
-        error = repr(exc)
-        print("PDF SAVE ERROR:", error)
-        if uri is not None:
-            try:
-                resolver.delete(uri, None, None)
-            except Exception:
-                pass
-        return False, error
-
-def _pdf_draw_text(canvas, paint, text, x, y, max_chars=70, line_gap=14):
-    text = str(text or "").replace("\\n", " ").strip()
-    if not text:
-        canvas.drawText("", x, y, paint)
-        return y + line_gap
-    while len(text) > max_chars:
-        cut = text.rfind(" ", 0, max_chars)
-        if cut <= 0:
-            cut = max_chars
-        canvas.drawText(text[:cut], x, y, paint)
-        y += line_gap
-        text = text[cut:].strip()
-    canvas.drawText(text, x, y, paint)
-    return y + line_gap
-
-
-def _create_daily_report_pdf(token, report):
-    try:
-        PdfDocument = autoclass("android.graphics.pdf.PdfDocument")
-        Paint = autoclass("android.graphics.Paint")
-        Typeface = autoclass("android.graphics.Typeface")
-        RectF = autoclass("android.graphics.RectF")
-        pdf = PdfDocument()
-        page_width, page_height = 595, 842
-        margin = 28
-        page_no = 1
-        y = margin
-
-        navy = 0xFF172554
-        gold = 0xFFD4AF37
-        slate = 0xFF475569
-        light = 0xFFF8FAFC
-        white = 0xFFFFFFFF
-
-        title_paint = Paint()
-        title_paint.setTextSize(19)
-        title_paint.setTypeface(Typeface.DEFAULT_BOLD)
-        title_paint.setColor(navy)
-
-        sub_paint = Paint()
-        sub_paint.setTextSize(9)
-        sub_paint.setColor(slate)
-
-        body_paint = Paint()
-        body_paint.setTextSize(8.5)
-        body_paint.setColor(navy)
-
-        header_paint = Paint()
-        header_paint.setTextSize(8)
-        header_paint.setTypeface(Typeface.DEFAULT_BOLD)
-        header_paint.setColor(white)
-
-        line_paint = Paint()
-        line_paint.setColor(0xFFE2E8F0)
-        line_paint.setStrokeWidth(1)
-
-        fill_paint = Paint()
-        fill_paint.setColor(light)
-
-        gold_paint = Paint()
-        gold_paint.setColor(gold)
-
-        navy_paint = Paint()
-        navy_paint.setColor(navy)
-
-        def start_page():
-            nonlocal page_no, y
-            info = PdfDocument.PageInfo.Builder(page_width, page_height, page_no).create()
-            page = pdf.startPage(info)
-            y = margin
-            return page
-
-        page = start_page()
-        canvas = page.getCanvas()
-
-        def draw_top_brand():
-            nonlocal y
-            canvas.drawRect(0, 0, page_width, 68, navy_paint)
-            canvas.drawRect(0, 64, page_width, 68, gold_paint)
-            canvas.drawText("My Business CRM", margin, 28, header_paint)
-            canvas.drawText("DAILY SALES REPORT", margin, 49, header_paint)
-            y = 92
-
-        def draw_summary():
-            nonlocal y
-            summary = [
-                ("Talked", report["talked"]),
-                ("New", report["new"]),
-                ("Follow-up", report["followup"]),
-                ("Visit Set", report["visits"]),
-                ("Completed", report["completed"]),
-                ("Cancelled", report["cancelled"]),
-            ]
-            box_w = (page_width - 2 * margin - 5 * 8) / 6.0
-            x = margin
-            for label, value in summary:
-                canvas.drawRoundRect(RectF(x, y, x + box_w, y + 43), 6, 6, fill_paint)
-                canvas.drawText(str(value), x + 7, y + 17, title_paint)
-                canvas.drawText(label, x + 7, y + 34, sub_paint)
-                x += box_w + 8
-            y += 56
-
-        draw_top_brand()
-        canvas.drawText("Report Date: " + report["date"], margin, y, sub_paint)
-        if report.get("project"):
-            canvas.drawText("Project: " + report["project"], margin + 145, y, sub_paint)
-        y += 18
-        draw_summary()
-
-        columns = [
-            ("#", 25), ("Name", 98), ("Phone", 78), ("Project", 92),
-            ("Type", 67), ("Visit", 72), ("Done", 40), ("Note", 95)
-        ]
-        x_positions = []
-        x = margin
-        for _, width in columns:
-            x_positions.append(x)
-            x += width
-        right = page_width - margin
-
-        def draw_header():
-            nonlocal y
-            canvas.drawRect(margin, y - 13, right, y + 7, navy_paint)
-            for idx, (label, _) in enumerate(columns):
-                canvas.drawText(label, x_positions[idx] + 3, y + 1, header_paint)
-            y += 18
-            canvas.drawLine(margin, y, right, y, line_paint)
-
-        draw_header()
-
-        for row in report["rows"]:
-            if y > page_height - 48:
-                footer = Paint()
-                footer.setTextSize(7)
-                footer.setColor(slate)
-                canvas.drawText("My Business CRM • Page " + str(page_no), margin, page_height - 18, footer)
-                pdf.finishPage(page)
-                page = start_page()
-                canvas = page.getCanvas()
-                draw_top_brand()
-                canvas.drawText("Report Date: " + report["date"] + " • Continued", margin, y, sub_paint)
-                y += 22
-                draw_header()
-
-            values = [
-                row["no"], row["name"], row["phone"], row["project"],
-                row["type"], row["visit"], row["done"], row["note"]
-            ]
-            row_y = y
-            max_lines = 1
-            for idx, value in enumerate(values):
-                text_value = str(value or "-").replace("\\n", " ")
-                width = columns[idx][1]
-                max_chars = max(4, int(width / 5.0))
-                chunks = []
-                while len(text_value) > max_chars:
-                    cut = text_value.rfind(" ", 0, max_chars)
-                    if cut <= 0:
-                        cut = max_chars
-                    chunks.append(text_value[:cut])
-                    text_value = text_value[cut:].strip()
-                chunks.append(text_value)
-                for line_idx, chunk in enumerate(chunks[:3]):
-                    canvas.drawText(chunk, x_positions[idx] + 3, row_y + line_idx * 10, body_paint)
-                max_lines = max(max_lines, min(3, len(chunks)))
-            y += max_lines * 10 + 8
-            canvas.drawLine(margin, y - 4, right, y - 4, line_paint)
-
-        footer = Paint()
-        footer.setTextSize(7)
-        footer.setColor(slate)
-        canvas.drawText("My Business CRM • Page " + str(page_no), margin, page_height - 18, footer)
-        pdf.finishPage(page)
-
-        out_dir = os.path.join("/tmp", "mycrm_reports")
-        os.makedirs(out_dir, exist_ok=True)
-        filename = "Daily_Report_" + report["date"] + ".pdf"
-        path = os.path.join(out_dir, filename)
-        FileOutputStream = autoclass("java.io.FileOutputStream")
-        output = FileOutputStream(path)
-        try:
-            pdf.writeTo(output)
-            output.flush()
-        finally:
-            output.close()
-            pdf.close()
-
-        ok, save_message = save_android_pdf_file(path)
-        if ok:
-            _android_pdf_status[token] = {
-                "done": True,
-                "ok": True,
-                "message": "Premium PDF saved to Downloads/My Business CRM/Reports"
-            }
-        else:
-            _android_pdf_status[token] = {
-                "done": True,
-                "ok": False,
-                "error": "PDF save failed: " + save_message
-            }
-    except Exception as exc:
-        print("PDF REPORT ERROR:", repr(exc))
-        _android_pdf_status[token] = {
-            "done": True,
-            "ok": False,
-            "error": str(exc) or "PDF could not be created"
-        }
-    finally:
-        _android_pdf_reports.pop(token, None)
+            me=cloud.me()
+            if me.get("user",{}).get("role") not in {"Admin","Manager"}: return "Access Denied"
+            lead=cloud.get_lead(lead_id).get("lead")
+            if not lead: return "Lead not found"
+            sales_users=[u for u in cloud.users() if u.get("role")=="Sales" and u.get("active")]
+            if request.method=="POST":
+                cloud.reassign_lead(lead_id,request.form.get("assigned_to") or None)
+                return redirect("/leads")
+            return render_template("reassign_lead.html",lead=lead,sales_users=sales_users)
+        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
+    conn=get_db(); current_user=conn.execute("SELECT * FROM users WHERE username=?",(session.get("username"),)).fetchone()
+    if not current_user or current_user["role"] not in ["Admin","Manager"]: conn.close(); return "Access Denied"
+    lead=conn.execute("""SELECT leads.*,projects.name AS project_name,users.name AS assigned_user_name FROM leads
+        LEFT JOIN projects ON leads.project_id=projects.id LEFT JOIN users ON leads.assigned_to=users.username WHERE leads.id=?""",(lead_id,)).fetchone()
+    if not lead: conn.close(); return "Lead not found"
+    sales_users=conn.execute("SELECT * FROM users WHERE active=1 AND role='Sales' ORDER BY name,username").fetchall()
+    if request.method=="POST": conn.execute("UPDATE leads SET assigned_to=? WHERE id=?",(request.form.get("assigned_to") or None,lead_id)); conn.commit(); conn.close(); return redirect("/leads")
+    conn.close(); return render_template("reassign_lead.html",lead=lead,sales_users=sales_users)
 
 @app.route("/share-daily-report", methods=["POST"])
 def share_daily_report():
