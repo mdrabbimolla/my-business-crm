@@ -430,7 +430,9 @@ def report_metrics():
     )
 
 from central_api_core import register_core_routes
+from central_project_files import register_project_file_routes
 register_core_routes(app, db, require_token)
+register_project_file_routes(app, db, require_token)
 
 if __name__ == "__main__":
     init_cloud_db()
