@@ -146,6 +146,9 @@ class CloudCRMClient:
     def create_payment(self, customer_id, data):
         return self._request("POST", f"/api/customers/{int(customer_id)}/payments", data)
 
+    def get_payment(self, payment_id):
+        return self._request("GET", f"/api/payments/{int(payment_id)}")
+
     def update_payment(self, payment_id, data):
         return self._request("PUT", f"/api/payments/{int(payment_id)}", data)
 
