@@ -115,6 +115,26 @@ class CloudCRMClient:
     def delete_project(self, project_id):
         return self._request("DELETE", f"/api/projects/{int(project_id)}")
 
+
+    def project_files(self, project_id):
+        return self._request("GET", f"/api/projects/{int(project_id)}/files").get("files", [])
+
+    def create_project_text(self, project_id, title, text_content):
+        return self._request(
+            "POST",
+            f"/api/projects/{int(project_id)}/files",
+            {"title": title, "item_type": "text", "text_content": text_content},
+        )
+
+    def create_project_file(self, project_id, data):
+        return self._request("POST", f"/api/projects/{int(project_id)}/files", data)
+
+    def get_project_file(self, file_id):
+        return self._request("GET", f"/api/project-files/{int(file_id)}")
+
+    def delete_project_file(self, file_id):
+        return self._request("DELETE", f"/api/project-files/{int(file_id)}")
+
     def leads(self, params=None):
         path = "/api/leads"
         if params:
