@@ -114,6 +114,77 @@ def register_core_routes(app, db, require_token):
             rows=conn.execute("SELECT * FROM followups ORDER BY follow_up_date ASC,id DESC").fetchall()
         conn.close(); return jsonify(followups=[dict(x) for x in rows])
 
+    @api.put("/api/followups/<int:followup_id>")
+    @require_token
+    def update_followup(followup_id):
+        data=request.get_json(silent=True) or {}
+        conn=db()
+        row=conn.execute("SELECT * FROM followups WHERE id=?", (followup_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="follow-up not found"),404
+        if g.user["role"]=="Sales" and row["lead_id"]:
+            lead=conn.execute("SELECT assigned_to FROM leads WHERE id=?", (row["lead_id"],)).fetchone()
+            if not lead or lead["assigned_to"] != g.user["username"]:
+                conn.close()
+                return jsonify(error="access denied"),403
+
+        name=(data.get("name",row["name"]) or "").strip()
+        phone=(data.get("phone",row["phone"]) or "").strip()
+        follow_up_date=data.get("follow_up_date",row["follow_up_date"]) or None
+        note=(data.get("note",row["note"]) or "").strip()
+        status=data.get("status",row["status"]) or "New"
+
+        if status == "Cancel":
+            project_id=None; project_name=None; assigned_to=None
+            if row["lead_id"]:
+                lead=conn.execute("""SELECT leads.*, projects.name AS project_name
+                                     FROM leads LEFT JOIN projects ON leads.project_id=projects.id
+                                     WHERE leads.id=?""", (row["lead_id"],)).fetchone()
+                if lead:
+                    project_id=lead["project_id"]; project_name=lead["project_name"]; assigned_to=lead["assigned_to"]
+                    conn.execute("UPDATE leads SET follow_up_date=NULL WHERE id=?", (row["lead_id"],))
+            conn.execute("""INSERT INTO canceled_leads
+                            (lead_id,name,phone,project_id,project_name,assigned_to,follow_up_date,note,cancelled_date,created_at)
+                            VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                         (row["lead_id"],name or row["name"],phone or row["phone"],project_id,project_name,assigned_to,
+                          follow_up_date or row["follow_up_date"],note or row["note"],
+                          datetime.now(timezone.utc).date().isoformat(),now()))
+            conn.execute("DELETE FROM followups WHERE id=?", (followup_id,))
+            conn.commit(); conn.close()
+            return jsonify(cancelled=True)
+
+        conn.execute("""UPDATE followups SET name=?,phone=?,follow_up_date=?,note=?,status=? WHERE id=?""",
+                     (name,phone,follow_up_date,note,status,followup_id))
+        if row["lead_id"]:
+            lead=conn.execute("SELECT id FROM leads WHERE id=?", (row["lead_id"],)).fetchone()
+            if lead:
+                conn.execute("""UPDATE leads SET name=?,phone=?,follow_up_date=?,notes=? WHERE id=?""",
+                             (name,phone,follow_up_date,note,row["lead_id"]))
+        conn.commit()
+        out=conn.execute("SELECT * FROM followups WHERE id=?", (followup_id,)).fetchone()
+        conn.close()
+        return jsonify(followup=dict(out))
+
+    @api.delete("/api/followups/<int:followup_id>")
+    @require_token
+    def delete_followup(followup_id):
+        conn=db()
+        row=conn.execute("SELECT * FROM followups WHERE id=?", (followup_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="follow-up not found"),404
+        if g.user["role"]=="Sales" and row["lead_id"]:
+            lead=conn.execute("SELECT assigned_to FROM leads WHERE id=?", (row["lead_id"],)).fetchone()
+            if not lead or lead["assigned_to"] != g.user["username"]:
+                conn.close()
+                return jsonify(error="access denied"),403
+        if row["lead_id"]:
+            conn.execute("UPDATE leads SET follow_up_date=NULL WHERE id=?", (row["lead_id"],))
+        conn.execute("DELETE FROM followups WHERE id=?", (followup_id,))
+        conn.commit(); conn.close()
+        return jsonify(deleted=True)
+
     @api.post("/api/followups")
     @require_token
     def create_followup():
