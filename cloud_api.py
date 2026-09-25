@@ -271,7 +271,36 @@ def create_lead():
 @require_token
 def list_customers():
     conn = db()
-    rows = conn.execute("SELECT * FROM customers ORDER BY id DESC").fetchall()
+    conditions = []
+    params = []
+    search = (request.args.get("search") or "").strip()
+    customer_filter = (request.args.get("filter") or "").strip()
+    project_id = (request.args.get("project_id") or "").strip()
+
+    if search:
+        like = "%" + search + "%"
+        conditions.append("(customers.name LIKE ? OR customers.phone LIKE ? OR customers.business LIKE ? OR customers.address LIKE ?)")
+        params.extend([like, like, like, like])
+    if customer_filter == "due":
+        conditions.append("(customers.sales - customers.paid) > 0")
+    elif customer_filter == "paid":
+        conditions.append("(customers.sales - customers.paid) <= 0")
+    if project_id:
+        try:
+            project_id = int(project_id)
+        except ValueError:
+            conn.close()
+            return jsonify(error="invalid project_id"), 400
+        conditions.append("customers.project_id = ?")
+        params.append(project_id)
+
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+    rows = conn.execute("""
+        SELECT customers.*, (customers.sales - customers.paid) AS due,
+               projects.name AS project_name
+        FROM customers
+        LEFT JOIN projects ON projects.id = customers.project_id
+    """ + where + " ORDER BY customers.id DESC", params).fetchall()
     conn.close()
     return jsonify(customers=[dict(r) for r in rows])
 
