@@ -1,6 +1,7 @@
 from datetime import date
 from urllib.parse import quote
 import json
+import base64
 import urllib.request
 import os
 import io
@@ -427,6 +428,7 @@ def _android_print_job_status(token):
 
 def _complete_project_file_picker(token, project_id, title, result_code, intent):
     try:
+        picker_meta = _project_file_picker_status.get(token) or {}
         if result_code != -1 or intent is None:
             _project_file_picker_status[token] = {"done": True, "ok": False, "project_id": project_id}
             return
@@ -479,6 +481,25 @@ def _complete_project_file_picker(token, project_id, title, result_code, intent)
         conn.commit()
         conn.close()
 
+        cloud_token = picker_meta.get("cloud_token")
+        if picker_meta.get("auth_mode") == "cloud" and cloud_token and _cloud_api_base_url():
+            try:
+                cloud = CloudCRMClient(base_url=_cloud_api_base_url(), token=cloud_token)
+                cloud.create_project_file(project_id, {
+                    "title": final_title,
+                    "item_type": "file",
+                    "file_name": safe_name,
+                    "mime_type": mime_type,
+                    "data_base64": base64.b64encode(bytes(data)).decode("ascii"),
+                })
+            except Exception as exc:
+                print("PROJECT FILE CLOUD SYNC ERROR:", repr(exc))
+                _project_file_picker_status[token] = {
+                    "done": True, "ok": False, "project_id": project_id,
+                    "error": "File saved locally but could not be synced to Central CRM",
+                }
+                return
+
         _project_file_picker_status[token] = {"done": True, "ok": True, "project_id": project_id}
     except Exception as exc:
         print("PROJECT FILE PICKER ERROR:", exc)
@@ -496,7 +517,12 @@ def start_android_project_file_picker(project_id, title):
     if autoclass is None or android_activity is None:
         return None
     token = uuid.uuid4().hex
-    _project_file_picker_status[token] = {"done": False, "project_id": project_id}
+    _project_file_picker_status[token] = {
+        "done": False,
+        "project_id": project_id,
+        "auth_mode": session.get("auth_mode"),
+        "cloud_token": session.get("cloud_token"),
+    }
     try:
         Intent = autoclass("android.content.Intent")
         PythonActivity = autoclass("org.kivy.android.PythonActivity")
@@ -1135,11 +1161,19 @@ def android_print_status(token):
 def android_pick_project_file(project_id):
     if not session.get("logged_in"):
         return redirect("/")
-    conn = get_db()
-    project = conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,)).fetchone()
-    conn.close()
-    if not project:
-        return "Project not found"
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            if not any(int(p.get("id", 0)) == int(project_id) for p in cloud.projects()):
+                return "Project not found"
+        except CloudAPIError as exc:
+            return f"Central CRM error: {exc}", 502
+    else:
+        conn = get_db()
+        project = conn.execute("SELECT id FROM projects WHERE id = ?", (project_id,)).fetchone()
+        conn.close()
+        if not project:
+            return "Project not found"
     title = request.args.get("title", "").strip()
     token = start_android_project_file_picker(project_id, title)
     if not token:
@@ -1159,6 +1193,25 @@ def android_project_file_status(token):
 def project_files(project_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            if request.method == "POST" and request.form.get("item_type", "file") == "text":
+                title = request.form.get("title", "").strip()
+                text_content = request.form.get("text_content", "").strip()
+                if not title or not text_content:
+                    return "Title and text are required"
+                cloud.create_project_text(project_id, title, text_content)
+                return redirect(f"/project-files/{project_id}")
+            projects = cloud.projects()
+            project = next((p for p in projects if int(p.get("id", 0)) == int(project_id)), None)
+            if not project:
+                return "Project not found"
+            files = cloud.project_files(project_id)
+            return render_template("project_files.html", project=project, files=files)
+        except CloudAPIError as exc:
+            return f"Central CRM error: {exc}", 502
+
     conn = get_db()
     project = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     if not project:
@@ -1201,6 +1254,20 @@ def project_files(project_id):
 def project_file_download(file_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            payload = cloud.get_project_file(file_id).get("file") or {}
+            raw = payload.get("data_base64")
+            if payload.get("item_type") != "file" or not raw:
+                return "File not found"
+            return send_file(io.BytesIO(base64.b64decode(raw)), as_attachment=True,
+                             download_name=payload.get("file_name") or "project_file",
+                             mimetype=payload.get("mime_type") or "application/octet-stream")
+        except CloudAPIError as exc:
+            return f"Central CRM error: {exc}", 502
+        except (ValueError, TypeError, binascii.Error):
+            return "Stored file data is invalid", 500
     conn = get_db()
     item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
     conn.close()
@@ -1212,6 +1279,13 @@ def project_file_download(file_id):
 def delete_project_file(file_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            result = cloud.delete_project_file(file_id)
+            return redirect(f"/project-files/{int(result.get('project_id'))}")
+        except CloudAPIError as exc:
+            return f"Central CRM error: {exc}", 502
     conn = get_db()
     item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
     if not item:
@@ -1232,6 +1306,32 @@ def delete_project_file(file_id):
 def share_project_file(file_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            item = cloud.get_project_file(file_id).get("file") or {}
+            if not item:
+                return "File not found"
+            if item.get("item_type") == "text":
+                ok, _ = share_android_text(item.get("text_content") or "")
+            else:
+                raw = item.get("data_base64") or ""
+                temp_path = os.path.join(tempfile.gettempdir(), f"mycrm_project_{file_id}_{uuid.uuid4().hex}")
+                with open(temp_path, "wb") as output:
+                    output.write(base64.b64decode(raw))
+                try:
+                    ok = share_android_file(temp_path, item.get("mime_type") or "application/octet-stream")
+                finally:
+                    try:
+                        os.remove(temp_path)
+                    except OSError:
+                        pass
+            return ("<h3>💬 WhatsApp খুলছে...</h3>" if ok else "<h3>⚠️ WhatsApp Share চালু করা যায়নি</h3>") + f"<a href='/project-files/{item['project_id']}'>← Back</a>"
+        except CloudAPIError as exc:
+            return f"Central CRM error: {exc}", 502
+        except (ValueError, TypeError, binascii.Error):
+            return "Stored file data is invalid", 500
+
     conn = get_db()
     item = conn.execute("SELECT * FROM project_files WHERE id = ?", (file_id,)).fetchone()
     conn.close()
