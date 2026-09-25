@@ -304,6 +304,131 @@ def list_customers():
     conn.close()
     return jsonify(customers=[dict(r) for r in rows])
 
+
+@app.get("/api/dashboard")
+@require_token
+def dashboard_metrics():
+    today = datetime.now(timezone.utc).date().isoformat()
+    conn = db()
+
+    total_customers = conn.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
+    total_sales = conn.execute("SELECT COALESCE(SUM(sales),0) FROM customers").fetchone()[0]
+
+    if g.user["role"] == "Sales":
+        visibility = " AND leads.assigned_to = ?"
+        visibility_params = [g.user["username"]]
+        followup_visibility = """ AND EXISTS (
+            SELECT 1 FROM leads
+            WHERE leads.id = followups.lead_id
+              AND leads.assigned_to = ?
+        )"""
+        canceled_visibility = " AND assigned_to = ?"
+    else:
+        visibility = ""
+        visibility_params = []
+        followup_visibility = ""
+        canceled_visibility = ""
+
+    today_followups = conn.execute(
+        "SELECT followups.* FROM followups WHERE follow_up_date = ?" + followup_visibility +
+        " ORDER BY id DESC",
+        [today] + ([g.user["username"]] if g.user["role"] == "Sales" else [])
+    ).fetchall()
+
+    missed = conn.execute(
+        "SELECT COUNT(*) FROM followups WHERE follow_up_date < ?" + followup_visibility,
+        [today] + ([g.user["username"]] if g.user["role"] == "Sales" else [])
+    ).fetchone()[0]
+    upcoming = conn.execute(
+        "SELECT COUNT(*) FROM followups WHERE follow_up_date > ?" + followup_visibility,
+        [today] + ([g.user["username"]] if g.user["role"] == "Sales" else [])
+    ).fetchone()[0]
+
+    visit_count = conn.execute(
+        "SELECT COUNT(*) FROM leads WHERE visit_date IS NOT NULL AND TRIM(visit_date) != ''" + visibility,
+        visibility_params
+    ).fetchone()[0]
+
+    cancel_count = conn.execute(
+        "SELECT COUNT(*) FROM canceled_leads WHERE 1=1" + canceled_visibility,
+        ([g.user["username"]] if g.user["role"] == "Sales" else [])
+    ).fetchone()[0]
+
+    conn.close()
+    return jsonify(
+        total_customers=total_customers,
+        total_sales=total_sales,
+        today_followup_count=len(today_followups),
+        missed_followup_count=missed,
+        upcoming_followup_count=upcoming,
+        visit_count=visit_count,
+        cancel_count=cancel_count,
+        today_followups=[dict(row) for row in today_followups]
+    )
+
+@app.get("/api/reports")
+@require_token
+def report_metrics():
+    payment_date = (request.args.get("payment_date") or "").strip()
+    expense_date = (request.args.get("expense_date") or "").strip()
+    conn = db()
+
+    total_sales = conn.execute("SELECT COALESCE(SUM(sales),0) FROM customers").fetchone()[0]
+    total_paid = conn.execute("SELECT COALESCE(SUM(paid),0) FROM customers").fetchone()[0]
+    total_due = total_sales - total_paid
+    total_expenses = conn.execute("SELECT COALESCE(SUM(amount),0) FROM expenses").fetchone()[0]
+    total_payments = conn.execute("SELECT COALESCE(SUM(amount),0) FROM payments").fetchone()[0]
+    net_profit = total_sales - total_expenses
+
+    category_expenses = conn.execute("""
+        SELECT category, COALESCE(SUM(amount),0) AS total
+        FROM expenses GROUP BY category ORDER BY total DESC
+    """).fetchall()
+
+    customers = conn.execute("""
+        SELECT id,name,phone,sales,paid,(sales-paid) AS due
+        FROM customers ORDER BY id DESC
+    """).fetchall()
+
+    payment_history = conn.execute("""
+        SELECT payments.id,payments.amount,payments.payment_date,payments.note,
+               customers.name,customers.phone
+        FROM payments JOIN customers ON payments.customer_id=customers.id
+        ORDER BY payments.id DESC
+    """).fetchall()
+
+    date_payments = []
+    if payment_date:
+        date_payments = conn.execute("""
+            SELECT payments.id,payments.amount,payments.payment_date,payments.note,
+                   customers.name,customers.phone
+            FROM payments JOIN customers ON payments.customer_id=customers.id
+            WHERE payments.payment_date=? ORDER BY payments.id DESC
+        """, (payment_date,)).fetchall()
+
+    date_expenses = []
+    if expense_date:
+        date_expenses = conn.execute("""
+            SELECT * FROM expenses WHERE expense_date=? ORDER BY id DESC
+        """, (expense_date,)).fetchall()
+
+    conn.close()
+    return jsonify(
+        total_sales=total_sales,
+        total_paid=total_paid,
+        total_due=total_due,
+        total_payments=total_payments,
+        total_expenses=total_expenses,
+        net_profit=net_profit,
+        category_expenses=[dict(row) for row in category_expenses],
+        customers=[dict(row) for row in customers],
+        payment_history=[dict(row) for row in payment_history],
+        date_payments=[dict(row) for row in date_payments],
+        payment_date=payment_date or None,
+        date_expenses=[dict(row) for row in date_expenses],
+        expense_date=expense_date or None
+    )
+
 from central_api_core import register_core_routes
 register_core_routes(app, db, require_token)
 
