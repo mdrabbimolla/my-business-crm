@@ -81,6 +81,12 @@ class CloudCRMClient:
     def create_project(self, data):
         return self._request("POST", "/api/projects", data)
 
+    def update_project(self, project_id, data):
+        return self._request("PUT", f"/api/projects/{int(project_id)}", data)
+
+    def delete_project(self, project_id):
+        return self._request("DELETE", f"/api/projects/{int(project_id)}")
+
     def leads(self):
         return self._request("GET", "/api/leads").get("leads", [])
 
