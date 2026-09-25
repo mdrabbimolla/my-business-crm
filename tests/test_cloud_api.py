@@ -453,3 +453,18 @@ if __name__ == "__main__":
         changed=self.client.put("/api/me/password", json={"current_password":"newsecret","new_password":"finalsecret"}, headers={"Authorization":"Bearer "+sales_token})
         self.assertEqual(changed.status_code, 200)
         self.assertEqual(self.client.post("/api/login", json={"username":"sales1","password":"finalsecret"}).status_code, 200)
+
+    def test_lead_notes_and_reports_are_central(self):
+        self._bootstrap("admin", "adminpass", "Admin")
+        token=self.client.post("/api/login",json={"username":"admin","password":"adminpass"}).get_json()["token"]
+        h={"Authorization":"Bearer "+token}
+        p=self.client.post("/api/projects",json={"name":"Report Project"},headers=h).get_json()["project"]
+        lead=self.client.post("/api/leads",json={"name":"Report Lead","phone":"01700000001","project_id":p["id"],"assigned_to":None,"visit_date":"2026-09-25"},headers=h).get_json()["lead"]
+        n=self.client.post(f"/api/lead-notes/{lead['id']}",json={"note":"First call","note_date":"2026-09-25"},headers=h)
+        self.assertEqual(n.status_code,201)
+        notes=self.client.get(f"/api/lead-notes/{lead['id']}",headers=h)
+        self.assertEqual(notes.status_code,200); self.assertEqual(len(notes.get_json()["notes"]),1)
+        daily=self.client.get("/api/reports/daily?date=2026-09-25",headers=h)
+        self.assertEqual(daily.status_code,200); self.assertEqual(daily.get_json()["talked_count"],1)
+        monthly=self.client.get("/api/reports/monthly",headers=h)
+        self.assertEqual(monthly.status_code,200)
