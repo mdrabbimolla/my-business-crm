@@ -354,7 +354,67 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(f"/api/expenses/{expense_id}",headers=headers).status_code,404)
         self.assertEqual(self.client.get("/api/expenses",headers=headers).json["total_expenses"],0)
 
+    def test_dashboard_and_reports_are_central(self):
+        response = self.client.post("/api/bootstrap-user",
+            json={"username":"dashboard-admin","password":"pass-123","name":"Dashboard Admin","role":"Admin"},
+            headers={"X-CRM-API-SECRET":"test-secret"})
+        self.assertEqual(response.status_code, 201)
+        login = self.client.post("/api/login", json={"username":"dashboard-admin","password":"pass-123"})
+        self.assertEqual(login.status_code, 200)
+        headers = {"Authorization": f"Bearer {login.json['token']}"}
+
+        project = self.client.post("/api/projects", json={"name":"Dashboard Project"}, headers=headers)
+        self.assertEqual(project.status_code, 201)
+        project_id = project.json["project"]["id"]
+
+        customer = self.client.post("/api/customers", json={
+            "name":"Dashboard Customer","phone":"01822222222","sales":100000,"paid":25000,
+            "project_id":project_id
+        }, headers=headers)
+        self.assertEqual(customer.status_code, 201)
+        customer_id = customer.json["customer"]["id"]
+
+        lead = self.client.post("/api/leads", json={
+            "name":"Dashboard Lead","phone":"01833333333","project_id":project_id,
+            "visit_date":"2026-09-25","follow_up_date":"2026-09-25"
+        }, headers=headers)
+        self.assertEqual(lead.status_code, 201)
+
+        followup = self.client.post("/api/followups", json={
+            "lead_id":lead.json["lead"]["id"],"name":"Dashboard Lead","phone":"01833333333",
+            "follow_up_date":"2026-09-25","note":"Today","status":"New"
+        }, headers=headers)
+        self.assertEqual(followup.status_code, 201)
+
+        payment = self.client.post(f"/api/customers/{customer_id}/payments",
+            json={"amount":25000,"payment_date":"2026-09-25","note":"Paid"},
+            headers=headers)
+        self.assertEqual(payment.status_code, 201)
+
+        expense = self.client.post("/api/expenses",
+            json={"amount":5000,"expense_date":"2026-09-25","category":"Office","note":"Expense"},
+            headers=headers)
+        self.assertEqual(expense.status_code, 201)
+
+        dashboard = self.client.get("/api/dashboard", headers=headers)
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.json["total_customers"], 1)
+        self.assertEqual(dashboard.json["total_sales"], 100000)
+        self.assertEqual(dashboard.json["today_followup_count"], 1)
+        self.assertEqual(dashboard.json["visit_count"], 1)
+
+        report = self.client.get("/api/reports?payment_date=2026-09-25&expense_date=2026-09-25", headers=headers)
+        self.assertEqual(report.status_code, 200)
+        self.assertEqual(report.json["total_sales"], 100000)
+        self.assertEqual(report.json["total_paid"], 50000)
+        self.assertEqual(report.json["total_due"], 50000)
+        self.assertEqual(report.json["total_payments"], 25000)
+        self.assertEqual(report.json["total_expenses"], 5000)
+        self.assertEqual(len(report.json["date_payments"]), 1)
+        self.assertEqual(len(report.json["date_expenses"]), 1)
+
     def test_core_unauthorized_access_is_blocked(self):
+
         self.assertEqual(self.client.get("/api/customers/1").status_code, 401)
         self.assertEqual(self.client.get("/api/expenses").status_code, 401)
 
