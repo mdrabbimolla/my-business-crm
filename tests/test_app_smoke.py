@@ -43,6 +43,18 @@ def test_login_page_and_local_login():
         response = client.get("/users")
         assert response.status_code == 200
         assert b"CRM Users" in response.data
+
+        response = client.post(
+            "/add-user",
+            data={"name": "Test Sales", "username": "testsales", "password": "test123", "role": "Sales", "active": "1"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/users")
+
+        response = client.get("/users")
+        assert response.status_code == 200
+        assert b"testsales" in response.data
     finally:
         try:
             os.remove(db_file)
