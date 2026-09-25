@@ -207,6 +207,83 @@ def me():
     return jsonify(ok=True, user={"id":g.user["id"],"username":g.user["username"],
                                   "name":g.user["name"],"role":g.user["role"]})
 
+@app.get("/api/users")
+@require_token
+def list_users():
+    if g.user["role"] != "Admin":
+        return jsonify(error="Admin access required"), 403
+    conn = db()
+    rows = conn.execute("SELECT id, username, name, role, active, created_at FROM users ORDER BY id DESC").fetchall()
+    conn.close()
+    return jsonify(users=[dict(row) for row in rows])
+
+@app.post("/api/users")
+@require_token
+def create_user():
+    if g.user["role"] != "Admin":
+        return jsonify(error="Admin access required"), 403
+    data = request.get_json(silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    name = (data.get("name") or "").strip()
+    role = (data.get("role") or "Sales").strip()
+    try:
+        active = int(data.get("active", 1))
+    except (TypeError, ValueError):
+        return jsonify(error="invalid active value"), 400
+    if not username or not password:
+        return jsonify(error="username and password are required"), 400
+    if role not in {"Admin", "Manager", "Sales"}:
+        return jsonify(error="invalid role"), 400
+    conn = db()
+    try:
+        cur = conn.execute("""INSERT INTO users(username,password_hash,name,role,active,created_at)
+            VALUES (?,?,?,?,?,?)""",
+            (username, generate_password_hash(password), name, role, 1 if active else 0,
+             datetime.now(timezone.utc).isoformat()))
+        conn.commit()
+        row = conn.execute("SELECT id, username, name, role, active, created_at FROM users WHERE id=?", (cur.lastrowid,)).fetchone()
+        return jsonify(user=dict(row)), 201
+    except sqlite3.IntegrityError:
+        return jsonify(error="username already exists"), 409
+    finally:
+        conn.close()
+
+@app.put("/api/users/<int:user_id>/password")
+@require_token
+def reset_user_password(user_id):
+    if g.user["role"] != "Admin":
+        return jsonify(error="Admin access required"), 403
+    data = request.get_json(silent=True) or {}
+    password = data.get("password") or ""
+    if not password:
+        return jsonify(error="password is required"), 400
+    conn = db()
+    row = conn.execute("SELECT id FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row:
+        conn.close()
+        return jsonify(error="user not found"), 404
+    conn.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(password), user_id))
+    conn.commit()
+    conn.close()
+    return jsonify(ok=True)
+
+@app.put("/api/me/password")
+@require_token
+def change_my_password():
+    data = request.get_json(silent=True) or {}
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    if not current_password or not new_password:
+        return jsonify(error="current and new passwords are required"), 400
+    if not check_password_hash(g.user["password_hash"], current_password):
+        return jsonify(error="Current password is incorrect"), 400
+    conn = db()
+    conn.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(new_password), g.user["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify(ok=True)
+
 @app.get("/api/projects")
 @require_token
 def list_projects():
