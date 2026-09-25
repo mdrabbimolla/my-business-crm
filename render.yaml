@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: my-business-crm-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: CRM_API_SECRET
+        generateValue: true
+      - key: CRM_CLOUD_DB
+        value: /app/data/cloud.db
