@@ -62,6 +62,18 @@ class CloudCRMClient:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise CloudAPIError("Central CRM API is unreachable") from exc
 
+    def dashboard(self):
+        return self._request("GET", "/api/dashboard")
+
+    def reports(self, params=None):
+        path = "/api/reports"
+        if params:
+            from urllib.parse import urlencode
+            clean = {k: v for k, v in params.items() if v not in (None, "")}
+            if clean:
+                path += "?" + urlencode(clean)
+        return self._request("GET", path)
+
     def health(self):
         return self._request("GET", "/api/health")
 
