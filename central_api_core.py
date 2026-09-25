@@ -353,6 +353,45 @@ def register_core_routes(app, db, require_token):
         total=conn.execute("SELECT COALESCE(SUM(amount),0) FROM expenses").fetchone()[0]; conn.close()
         return jsonify(expenses=[dict(x) for x in rows],total_expenses=total)
 
+    @api.put("/api/expenses/<int:expense_id>")
+    @require_token
+    def update_expense(expense_id):
+        data=request.get_json(silent=True) or {}
+        conn=db()
+        row=conn.execute("SELECT * FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="expense not found"),404
+        try:
+            amount=float(data.get("amount",row["amount"]) or 0)
+            if amount<=0:
+                conn.close()
+                return jsonify(error="expense amount must be greater than zero"),400
+            conn.execute("""UPDATE expenses SET amount=?,expense_date=?,category=?,note=? WHERE id=?""",
+                         (amount,data.get("expense_date",row["expense_date"]),data.get("category",row["category"]),
+                          data.get("note",row["note"]),expense_id))
+            conn.commit()
+            out=conn.execute("SELECT * FROM expenses WHERE id=?", (expense_id,)).fetchone()
+            return jsonify(expense=dict(out))
+        except ValueError:
+            conn.rollback()
+            return jsonify(error="invalid expense data"),400
+        finally:
+            conn.close()
+
+    @api.delete("/api/expenses/<int:expense_id>")
+    @require_token
+    def delete_expense(expense_id):
+        conn=db()
+        row=conn.execute("SELECT id FROM expenses WHERE id=?", (expense_id,)).fetchone()
+        if not row:
+            conn.close()
+            return jsonify(error="expense not found"),404
+        conn.execute("DELETE FROM expenses WHERE id=?", (expense_id,))
+        conn.commit()
+        conn.close()
+        return jsonify(deleted=True)
+
     @api.post("/api/expenses")
     @require_token
     def create_expense():
