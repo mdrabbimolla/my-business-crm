@@ -1688,95 +1688,112 @@ def delete_customer(customer_id):
 
 @app.route("/receipt-options/<int:payment_id>")
 def receipt_options(payment_id):
+
     if not session.get("logged_in"):
         return redirect("/")
 
-    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
-    if cloud and cloud.enabled:
-        try:
-            payment = cloud.get_payment(payment_id).get("payment")
-            if not payment:
-                return "Payment not found"
-            customer = cloud.get_customer(payment["customer_id"]).get("customer")
-            if not customer:
-                return "Customer not found"
-            return render_template("receipt_options.html", payment=payment, customer=customer)
-        except CloudAPIError as exc:
-            return "Central CRM error: " + str(exc)
-
     conn = get_db()
-    payment = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+
+    payment = conn.execute(
+        "SELECT * FROM payments WHERE id = ?",
+        (payment_id,)
+    ).fetchone()
+
     if not payment:
         conn.close()
         return "Payment not found"
-    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (payment["customer_id"],)).fetchone()
+
+    customer = conn.execute(
+        "SELECT * FROM customers WHERE id = ?",
+        (payment["customer_id"],)
+    ).fetchone()
+
     conn.close()
+
     if not customer:
         return "Customer not found"
-    return render_template("receipt_options.html", payment=payment, customer=customer)
+
+    return render_template(
+        "receipt_options.html",
+        payment=payment,
+        customer=customer
+    )
 @app.route("/payment-receipt/<int:payment_id>")
 def payment_receipt(payment_id):
+
     if not session.get("logged_in"):
         return redirect("/")
 
     show_due = request.args.get("show_due") == "1"
-    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
-    if cloud and cloud.enabled:
-        try:
-            payment = cloud.get_payment(payment_id).get("payment")
-            if not payment:
-                return "Payment not found"
-            customer = cloud.get_customer(payment["customer_id"]).get("customer")
-            if not customer:
-                return "Customer not found"
-            settings = cloud.receipt_settings()
-            due = float(customer.get("due") or 0)
-            return render_template("payment_receipt.html", payment=payment, customer=customer,
-                                   due=due, show_due=show_due, settings=settings)
-        except CloudAPIError as exc:
-            return "Central CRM error: " + str(exc)
 
     conn = get_db()
-    payment = conn.execute("SELECT * FROM payments WHERE id = ?", (payment_id,)).fetchone()
+
+    payment = conn.execute(
+        "SELECT * FROM payments WHERE id = ?",
+        (payment_id,)
+    ).fetchone()
+
     if not payment:
         conn.close()
         return "Payment not found"
-    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (payment["customer_id"],)).fetchone()
+
+    customer = conn.execute(
+        "SELECT * FROM customers WHERE id = ?",
+        (payment["customer_id"],)
+    ).fetchone()
+
     if not customer:
         conn.close()
         return "Customer not found"
+
     due = customer["sales"] - customer["paid"]
-    settings = conn.execute("SELECT * FROM receipt_settings WHERE id = 1").fetchone()
+
+    settings = conn.execute(
+        "SELECT * FROM receipt_settings WHERE id = 1"
+    ).fetchone()
+
     conn.close()
-    return render_template("payment_receipt.html", payment=payment, customer=customer,
-                           due=due, show_due=show_due, settings=settings)
+
+    return render_template(
+        "payment_receipt.html",
+        payment=payment,
+        customer=customer,
+        due=due,
+        show_due=show_due,
+        settings=settings
+    )
 @app.route("/receipt-settings", methods=["GET", "POST"])
 def receipt_settings():
+
     if not session.get("logged_in"):
         return redirect("/")
 
-    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
-    if cloud and cloud.enabled:
-        try:
-            if request.method == "POST":
-                cloud.update_receipt_settings(request.form.get("header_name", ""))
-                return redirect("/receipt-settings")
-            settings = cloud.receipt_settings()
-            return render_template("receipt_settings.html", settings=settings)
-        except CloudAPIError as exc:
-            return "Central CRM error: " + str(exc)
-
     conn = get_db()
+
     if request.method == "POST":
-        header_name = request.form.get("header_name", "").strip()
-        if not header_name:
-            conn.close()
-            return "Header name cannot be empty"
-        conn.execute("UPDATE receipt_settings SET header_name = ? WHERE id = 1", (header_name,))
+
+        header_name = request.form.get("header_name")
+
+        conn.execute("""
+            UPDATE receipt_settings
+            SET header_name = ?
+            WHERE id = 1
+        """, (header_name,))
+
         conn.commit()
-    settings = conn.execute("SELECT * FROM receipt_settings WHERE id = 1").fetchone()
+
+    settings = conn.execute(
+        "SELECT * FROM receipt_settings WHERE id = 1"
+    ).fetchone()
+
+    print("SETTINGS:", settings)
+
     conn.close()
-    return render_template("receipt_settings.html", settings=settings)
+
+    return render_template(
+        "receipt_settings.html",
+        settings=settings
+    )
 @app.route("/add-followup", methods=["GET", "POST"])
 def add_followup():
     if not session.get("logged_in"):
