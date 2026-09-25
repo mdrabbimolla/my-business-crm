@@ -1194,6 +1194,25 @@ def edit_project(project_id):
     if not session.get("logged_in"):
         return redirect("/")
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            project = next((p for p in cloud.projects() if int(p["id"]) == int(project_id)), None)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        if not project:
+            return "Project not found"
+        if request.method == "POST":
+            data = {"name": request.form.get("name", "").strip(), "location": request.form.get("location", "").strip(), "status": request.form.get("status", "Active"), "notes": request.form.get("notes", "").strip()}
+            if not data["name"]:
+                return "Project name is required"
+            try:
+                cloud.update_project(project_id, data)
+            except CloudAPIError as exc:
+                return "Central CRM error: " + str(exc)
+            return redirect("/projects")
+        return render_template("edit_project.html", project=project)
+
     conn = get_db()
 
     project = conn.execute(
@@ -1254,6 +1273,13 @@ def edit_project(project_id):
 def delete_project(project_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            cloud.update_project(project_id, {"status": "Inactive"})
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return redirect("/projects")
     conn = get_db()
     lead_count = conn.execute("SELECT COUNT(*) FROM leads WHERE project_id = ?", (project_id,)).fetchone()[0]
     customer_count = conn.execute("SELECT COUNT(*) FROM customers WHERE project_id = ?", (project_id,)).fetchone()[0]
@@ -1400,6 +1426,14 @@ def share_project_file(file_id):
 def projects():
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            project_rows = cloud.projects()
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        project_rows.sort(key=lambda p: (0 if p.get("status") == "Active" else 1, (p.get("name") or "").lower()))
+        return render_template("projects.html", projects=project_rows)
     conn = get_db()
     projects = conn.execute("SELECT * FROM projects ORDER BY CASE WHEN status = 'Active' THEN 0 ELSE 1 END, name").fetchall()
     conn.close()
@@ -1409,6 +1443,17 @@ def projects():
 def toggle_project(project_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            project = next((p for p in cloud.projects() if int(p["id"]) == int(project_id)), None)
+            if not project:
+                return "Project not found"
+            new_status = "Inactive" if project.get("status") == "Active" else "Active"
+            cloud.update_project(project_id, {"status": new_status})
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return redirect("/projects")
     conn = get_db()
     project = conn.execute("SELECT status FROM projects WHERE id = ?", (project_id,)).fetchone()
     if not project:
@@ -1425,6 +1470,17 @@ def add_project():
 
     if not session.get("logged_in"):
         return redirect("/")
+
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled and request.method == "POST":
+        data = {"name": request.form.get("name", "").strip(), "location": request.form.get("location", "").strip(), "status": request.form.get("status", "Active"), "notes": request.form.get("notes", "").strip()}
+        if not data["name"]:
+            return "Project name is required"
+        try:
+            cloud.create_project(data)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return redirect("/projects")
 
     if request.method == "POST":
 
