@@ -1682,6 +1682,21 @@ def add_customer():
 
         return redirect("/customers")
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            projects = [p for p in cloud.projects() if p.get("status") == "Active"]
+            sales_users = [u for u in cloud.users() if u.get("role") == "Sales"]
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        if request.method == "POST":
+            data = {"name": request.form.get("name","").strip(), "phone": request.form.get("phone","").strip(), "project_id": request.form.get("project_id") or None, "notes": request.form.get("notes","").strip(), "follow_up_date": request.form.get("follow_up_date") or None, "status": request.form.get("status","New"), "assigned_to": request.form.get("assigned_to") or None, "visit_date": request.form.get("visit_date") or None, "visit_time": request.form.get("visit_time") or None}
+            if not data["phone"]: return "Phone number is required"
+            try: cloud.create_lead(data)
+            except CloudAPIError as exc: return "Central CRM error: " + str(exc)
+            return redirect("/leads")
+        return render_template("add_lead.html", projects=projects, sales_users=sales_users)
+
     conn = get_db()
 
     projects = conn.execute("""
@@ -2525,6 +2540,19 @@ def leads():
     search = request.args.get("search", "").strip()
     project_filter = request.args.get("project_id", "").strip()
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            params = {}
+            if search: params["search"] = search
+            if project_filter: params["project_id"] = project_filter
+            cloud_leads = cloud.leads(params)
+            projects = [p for p in cloud.projects() if p.get("status") == "Active"]
+            current_user = cloud.me()
+            return render_template("leads.html", leads=cloud_leads, search=search, projects=projects, project_filter=project_filter, current_role=current_user.get("role"))
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+
     conn = get_db()
 
     # Current logged-in user
@@ -2748,6 +2776,24 @@ def edit_lead(lead_id):
     if not session.get("logged_in"):
         return redirect("/")
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            current_user = cloud.me()
+            lead = cloud.get_lead(lead_id)
+            if current_user.get("role") == "Sales" and lead.get("assigned_to") != current_user.get("username"): return "Access Denied"
+            projects = [p for p in cloud.projects() if p.get("status") == "Active"]
+            sales_users = [u for u in cloud.users() if u.get("role") == "Sales"]
+            if request.method == "POST":
+                data = {"name": request.form.get("name","").strip(), "phone": request.form.get("phone","").strip(), "project_id": request.form.get("project_id") or None, "notes": request.form.get("notes","").strip(), "follow_up_date": request.form.get("follow_up_date") or None, "visit_date": request.form.get("visit_date") or None, "visit_time": request.form.get("visit_time") or None, "status": request.form.get("status","New")}
+                if current_user.get("role") in ["Admin","Manager"]: data["assigned_to"] = request.form.get("assigned_to") or None
+                else: data["assigned_to"] = lead.get("assigned_to")
+                if not data["phone"]: return "Phone number is required"
+                cloud.update_lead(lead_id, data)
+                return redirect("/leads")
+            return render_template("edit_lead.html", lead=lead, projects=projects, sales_users=sales_users, current_role=current_user.get("role"))
+        except CloudAPIError as exc: return "Central CRM error: " + str(exc)
+
     conn = get_db()
 
     current_user = conn.execute("""
@@ -2927,6 +2973,13 @@ def edit_lead(lead_id):
 def delete_lead(lead_id):
     if not session.get("logged_in"):
         return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            if cloud.me().get("role") != "Admin": return "Access Denied"
+            cloud._request("DELETE", f"/api/leads/{int(lead_id)}")
+        except CloudAPIError as exc: return "Central CRM error: " + str(exc)
+        return redirect("/leads")
     conn = get_db()
     current_user = conn.execute("SELECT role, username FROM users WHERE username = ? AND active = 1", (session.get("username"),)).fetchone()
     lead = conn.execute("SELECT assigned_to FROM leads WHERE id = ?", (lead_id,)).fetchone()
