@@ -1,4 +1,56 @@
-from datetime import date
+@app.route("/", methods=["GET", "POST"])
+def login():
+
+    if request.method == "POST":
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        cloud = _cloud_client()
+        if cloud.enabled:
+            try:
+                result = cloud.login(username, password)
+                user = result.get("user") or {}
+                if _sync_cloud_user_to_local(user, password):
+                    session["logged_in"] = True
+                    session["username"] = user.get("username") or username
+                    session["cloud_token"] = result.get("token", "")
+                    session["auth_mode"] = "cloud"
+                    return redirect("/dashboard")
+            except CloudAPIError as exc:
+                print("CLOUD LOGIN ERROR:", exc)
+                return """
+                <h3>Central CRM login failed!</h3>
+                <p>Please check your username/password or internet connection.</p>
+                <a href="/">Try Again</a>
+                """
+
+        conn = get_db()
+        user = conn.execute(
+            """
+            SELECT *
+            FROM users
+            WHERE username = ?
+            AND password = ?
+            AND active = 1
+            """,
+            (username, password)
+        ).fetchone()
+        conn.close()
+
+        if user:
+            session["logged_in"] = True
+            session["username"] = user["username"]
+            session["auth_mode"] = "local"
+            session.pop("cloud_token", None)
+            return redirect("/dashboard")
+
+        return """
+        <h3>Wrong username or password!</h3>
+        <a href="/">Try Again</a>
+        """
+
+    return from datetime import date
 from urllib.parse import quote
 import json
 import urllib.request
@@ -13,6 +65,7 @@ import threading
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
 from database import get_db, init_db
+from cloud_client import CloudCRMClient, CloudAPIError
 
 try:
     from jnius import autoclass, cast, PythonJavaClass, java_method
@@ -50,6 +103,62 @@ try:
     from app_version import APP_VERSION
 except ImportError:
     APP_VERSION = "1.0.0"
+
+
+def _cloud_api_base_url():
+    """Read the central API URL from env or an app-private config file."""
+    value = os.environ.get("CRM_CLOUD_API_URL", "").strip().rstrip("/")
+    if value:
+        return value
+    try:
+        config_path = os.path.join(_app_private_storage_root(), "cloud_api_url.txt")
+        with open(config_path, "r", encoding="utf-8") as config:
+            return config.read().strip().rstrip("/")
+    except Exception:
+        return ""
+
+
+def _cloud_client(token=None):
+    return CloudCRMClient(base_url=_cloud_api_base_url(), token=token)
+
+
+def _sync_cloud_user_to_local(user, password):
+    """Keep the existing local UI permission queries compatible after cloud login."""
+    if not user:
+        return False
+    username = (user.get("username") or "").strip()
+    if not username:
+        return False
+    conn = get_db()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM users WHERE username = ?",
+            (username,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE users SET name = ?, role = ?, active = 1, password = ? WHERE username = ?",
+                (
+                    user.get("name") or username,
+                    user.get("role") or "Sales",
+                    password,
+                    username,
+                )
+            )
+        else:
+            conn.execute(
+                "INSERT INTO users (username,password,name,role,active) VALUES (?,?,?,?,1)",
+                (
+                    username,
+                    password,
+                    user.get("name") or username,
+                    user.get("role") or "Sales",
+                )
+            )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
 
 
 def _start_android_url(url, action="VIEW", package_name=None):
@@ -678,8 +787,13 @@ def change_password():
 @app.route("/logout")
 def logout():
 
-    session.clear()
+    token = session.get("cloud_token", "")
+    if token:
+        # Central API currently expires tokens server-side by policy; clearing the
+        # local token prevents this device from reusing it after logout.
+        session.pop("cloud_token", None)
 
+    session.clear()
     return redirect("/")
 
 @app.route("/add-user", methods=["GET", "POST"])
