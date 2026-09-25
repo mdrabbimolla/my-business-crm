@@ -122,8 +122,14 @@ class CloudCRMClient:
     def canceled_leads(self):
         return self._request("GET", "/api/canceled-leads").get("canceled_leads", [])
 
-    def customers(self):
-        return self._request("GET", "/api/customers").get("customers", [])
+    def customers(self, params=None):
+        path = "/api/customers"
+        if params:
+            from urllib.parse import urlencode
+            clean = {k: v for k, v in params.items() if v not in (None, "")}
+            if clean:
+                path += "?" + urlencode(clean)
+        return self._request("GET", path).get("customers", [])
 
     def get_customer(self, customer_id):
         return self._request("GET", f"/api/customers/{int(customer_id)}")
@@ -131,8 +137,20 @@ class CloudCRMClient:
     def create_customer(self, data):
         return self._request("POST", "/api/customers", data)
 
+    def update_customer(self, customer_id, data):
+        return self._request("PUT", f"/api/customers/{int(customer_id)}", data)
+
+    def delete_customer(self, customer_id):
+        return self._request("DELETE", f"/api/customers/{int(customer_id)}")
+
     def create_payment(self, customer_id, data):
         return self._request("POST", f"/api/customers/{int(customer_id)}/payments", data)
+
+    def update_payment(self, payment_id, data):
+        return self._request("PUT", f"/api/payments/{int(payment_id)}", data)
+
+    def delete_payment(self, payment_id):
+        return self._request("DELETE", f"/api/payments/{int(payment_id)}")
 
     def expenses(self):
         return self._request("GET", "/api/expenses")
