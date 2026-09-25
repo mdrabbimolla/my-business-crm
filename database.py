@@ -1,6 +1,22 @@
+import os
 import sqlite3
 
-DATABASE = "database.db"
+
+def _database_path():
+    """Return a writable app-private database path on Android, with a desktop fallback."""
+    try:
+        from jnius import autoclass
+        PythonActivity = autoclass("org.kivy.android.PythonActivity")
+        activity = PythonActivity.mActivity
+        files_dir = activity.getFilesDir().getAbsolutePath()
+        os.makedirs(files_dir, exist_ok=True)
+        return os.path.join(files_dir, "database.db")
+    except Exception:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.join(base_dir, "database.db")
+
+
+DATABASE = _database_path()
 
 
 def get_db():
