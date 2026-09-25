@@ -170,6 +170,9 @@ class CloudCRMClient:
     def create_expense(self, data):
         return self._request("POST", "/api/expenses", data)
 
+    def get_expense(self, expense_id):
+        return self._request("GET", f"/api/expenses/{int(expense_id)}")
+
     def update_expense(self, expense_id, data):
         return self._request("PUT", f"/api/expenses/{int(expense_id)}", data)
 
