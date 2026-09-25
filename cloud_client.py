@@ -119,6 +119,12 @@ class CloudCRMClient:
     def create_followup(self, data):
         return self._request("POST", "/api/followups", data)
 
+    def update_followup(self, followup_id, data):
+        return self._request("PUT", f"/api/followups/{int(followup_id)}", data)
+
+    def delete_followup(self, followup_id):
+        return self._request("DELETE", f"/api/followups/{int(followup_id)}")
+
     def canceled_leads(self):
         return self._request("GET", "/api/canceled-leads").get("canceled_leads", [])
 
