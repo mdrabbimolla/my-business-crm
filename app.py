@@ -1520,7 +1520,6 @@ def add_project():
 
 @app.route("/customers")
 def customers():
-
     if not session.get("logged_in"):
         return redirect("/")
 
@@ -1528,489 +1527,250 @@ def customers():
     customer_filter = request.args.get("filter", "").strip()
     project_filter = request.args.get("project_id", "").strip()
 
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            params = {"search": search, "filter": customer_filter, "project_id": project_filter}
+            customer_rows = cloud.customers(params)
+            projects = [p for p in cloud.projects() if p.get("status") == "Active"]
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return render_template("customers.html", customers=customer_rows, search=search,
+                               customer_filter=customer_filter, projects=projects,
+                               project_filter=project_filter)
+
     conn = get_db()
-
-    query = """
-        SELECT customers.*,
-           (customers.sales - customers.paid) AS due,
-           projects.name AS project_name
-        FROM customers
-        LEFT JOIN projects
-        ON customers.project_id = projects.id
-        WHERE 1=1
-    """
+    query = """SELECT customers.*, (customers.sales - customers.paid) AS due,
+                      projects.name AS project_name
+               FROM customers LEFT JOIN projects ON customers.project_id = projects.id
+               WHERE 1=1"""
     params = []
-
     if search:
-        query += """
-            AND (
-                name LIKE ?
-                OR phone LIKE ?
-                OR business LIKE ?
-                OR address LIKE ?
-            )
-        """
-
-        search_value = f"%{search}%"
-
-        params.extend([
-            search_value,
-            search_value,
-            search_value,
-            search_value
-        ])
-
+        query += " AND (customers.name LIKE ? OR customers.phone LIKE ? OR customers.business LIKE ? OR customers.address LIKE ?)"
+        value = f"%{search}%"; params.extend([value, value, value, value])
     if customer_filter == "due":
-        query += " AND (sales - paid) > 0"
-
+        query += " AND (customers.sales - customers.paid) > 0"
     elif customer_filter == "paid":
-        query += " AND (sales - paid) <= 0"
-
+        query += " AND (customers.sales - customers.paid) <= 0"
     if project_filter:
-        query += " AND customers.project_id = ?"
-        params.append(project_filter)
-
-    query += " ORDER BY id DESC"
-
-    customers = conn.execute(
-        query,
-        params
-    ).fetchall()
-
-    projects = conn.execute("""
-        SELECT *
-        FROM projects
-        WHERE status = 'Active'
-        ORDER BY name
-    """).fetchall()
-
+        query += " AND customers.project_id = ?"; params.append(project_filter)
+    query += " ORDER BY customers.id DESC"
+    customer_rows = conn.execute(query, params).fetchall()
+    projects = conn.execute("SELECT * FROM projects WHERE status='Active' ORDER BY name").fetchall()
     conn.close()
+    return render_template("customers.html", customers=customer_rows, search=search,
+                           customer_filter=customer_filter, projects=projects,
+                           project_filter=project_filter)
 
-    return render_template(
-        "customers.html",
-        customers=customers,
-        search=search,
-        customer_filter=customer_filter,
-        projects=projects,
-        project_filter=project_filter
-    )
 
 @app.route("/add-customer", methods=["GET", "POST"])
 def add_customer():
-
     if not session.get("logged_in"):
         return redirect("/")
-
-    if request.method == "POST":
-
-        name = request.form.get("name")
-        phone = request.form.get("phone")
-        address = request.form.get("address")
-        business = request.form.get("business")
-        notes = request.form.get("notes")
-        follow_up = request.form.get("follow_up")
-
-        project_id = request.form.get("project_id") or None
-
-        sales = float(request.form.get("sales") or 0)
-        paid = float(request.form.get("paid") or 0)
-
-        conn = get_db()
-
-        # Check duplicate phone in customers
-        existing_customer = conn.execute("""
-            SELECT name
-            FROM customers
-            WHERE phone = ?
-        """, (phone,)).fetchone()
-
-        if existing_customer:
-            existing_name = existing_customer["name"] or "Name not added"
-
-            conn.close()
-
-            return f"""
-            <h2>⚠️ Duplicate Phone Number</h2>
-            <p>এই ফোন নম্বরটি আগে থেকেই Customer হিসেবে আছে।</p>
-            <p><strong>👤 Name:</strong> {existing_name}</p>
-            <a href="/add-customer">← Back to Add Customer</a>
-            """
-
-        # Check duplicate phone in leads
-        existing_lead = conn.execute("""
-            SELECT
-                leads.name,
-                projects.name AS project_name
-            FROM leads
-            LEFT JOIN projects
-                ON leads.project_id = projects.id
-            WHERE leads.phone = ?
-        """, (phone,)).fetchone()
-
-        if existing_lead:
-            existing_name = existing_lead["name"] or "Name not added"
-            project_name = existing_lead["project_name"] or "Unassigned"
-
-            conn.close()
-
-            return f"""
-            <h2>⚠️ Duplicate Phone Number</h2>
-            <p>এই ফোন নম্বরটি আগে থেকেই Lead হিসেবে CRM-এ আছে।</p>
-            <p><strong>👤 Name:</strong> {existing_name}</p>
-            <p><strong>🏗️ Project:</strong> {project_name}</p>
-            <a href="/add-customer">← Back to Add Customer</a>
-            """
-
-        conn.execute("""
-            INSERT INTO customers
-            (name, phone, address, business, notes, follow_up, sales, paid, project_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            name,
-            phone,
-            address,
-            business,
-            notes,
-            follow_up,
-            sales,
-            paid,
-            project_id
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/customers")
 
     cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
     if cloud and cloud.enabled:
         try:
             projects = [p for p in cloud.projects() if p.get("status") == "Active"]
-            sales_users = [u for u in cloud.users() if u.get("role") == "Sales"]
         except CloudAPIError as exc:
             return "Central CRM error: " + str(exc)
         if request.method == "POST":
-            data = {"name": request.form.get("name","").strip(), "phone": request.form.get("phone","").strip(), "project_id": request.form.get("project_id") or None, "notes": request.form.get("notes","").strip(), "follow_up_date": request.form.get("follow_up_date") or None, "status": request.form.get("status","New"), "assigned_to": request.form.get("assigned_to") or None, "visit_date": request.form.get("visit_date") or None, "visit_time": request.form.get("visit_time") or None}
-            if not data["phone"]: return "Phone number is required"
-            try: cloud.create_lead(data)
-            except CloudAPIError as exc: return "Central CRM error: " + str(exc)
-            return redirect("/leads")
-        return render_template("add_lead.html", projects=projects, sales_users=sales_users)
+            data = {
+                "name": request.form.get("name","").strip(),
+                "phone": request.form.get("phone","").strip(),
+                "address": request.form.get("address","").strip(),
+                "business": request.form.get("business","").strip(),
+                "notes": request.form.get("notes","").strip(),
+                "follow_up": request.form.get("follow_up","").strip() or None,
+                "sales": request.form.get("sales") or 0,
+                "paid": request.form.get("paid") or 0,
+                "project_id": request.form.get("project_id") or None,
+            }
+            try:
+                cloud.create_customer(data)
+            except CloudAPIError as exc:
+                return "Central CRM error: " + str(exc)
+            return redirect("/customers")
+        return render_template("add_customer.html", projects=projects)
 
-    conn = get_db()
+    if request.method == "POST":
+        name = request.form.get("name"); phone = request.form.get("phone")
+        address = request.form.get("address"); business = request.form.get("business")
+        notes = request.form.get("notes"); follow_up = request.form.get("follow_up")
+        project_id = request.form.get("project_id") or None
+        sales = float(request.form.get("sales") or 0); paid = float(request.form.get("paid") or 0)
+        conn = get_db()
+        existing_customer = conn.execute("SELECT name FROM customers WHERE phone=?", (phone,)).fetchone()
+        if existing_customer:
+            existing_name = existing_customer["name"] or "Name not added"; conn.close()
+            return f"<h2>⚠️ Duplicate Phone Number</h2><p>এই ফোন নম্বরটি আগে থেকেই Customer হিসেবে আছে।</p><p><strong>👤 Name:</strong> {existing_name}</p><a href='/add-customer'>← Back to Add Customer</a>"
+        existing_lead = conn.execute("""SELECT leads.name, projects.name AS project_name FROM leads
+                                        LEFT JOIN projects ON leads.project_id=projects.id WHERE leads.phone=?""",(phone,)).fetchone()
+        if existing_lead:
+            existing_name = existing_lead["name"] or "Name not added"; project_name = existing_lead["project_name"] or "Unassigned"; conn.close()
+            return f"<h2>⚠️ Duplicate Phone Number</h2><p>এই ফোন নম্বরটি আগে থেকেই Lead হিসেবে CRM-এ আছে।</p><p><strong>👤 Name:</strong> {existing_name}</p><p><strong>🏗️ Project:</strong> {project_name}</p><a href='/add-customer'>← Back to Add Customer</a>"
+        conn.execute("""INSERT INTO customers(name,phone,address,business,notes,follow_up,sales,paid,project_id)
+                        VALUES(?,?,?,?,?,?,?,?,?)""",(name,phone,address,business,notes,follow_up,sales,paid,project_id))
+        conn.commit(); conn.close()
+        return redirect("/customers")
+    conn=get_db(); projects=conn.execute("SELECT * FROM projects WHERE status='Active' ORDER BY name").fetchall(); conn.close()
+    return render_template("add_customer.html", projects=projects)
 
-    projects = conn.execute("""
-        SELECT *
-        FROM projects
-        WHERE status = 'Active'
-        ORDER BY name
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "add_customer.html",
-        projects=projects
-    )
 
 @app.route("/edit-customer/<int:customer_id>", methods=["GET", "POST"])
 def edit_customer(customer_id):
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            customer = cloud.get_customer(customer_id).get("customer")
+            if not customer: return "Customer not found"
+            projects = [p for p in cloud.projects() if p.get("status") == "Active"]
+            if request.method == "POST":
+                data = {
+                    "name": request.form.get("name","").strip(),
+                    "phone": request.form.get("phone","").strip(),
+                    "address": request.form.get("address","").strip(),
+                    "business": request.form.get("business","").strip(),
+                    "notes": request.form.get("notes","").strip(),
+                    "follow_up": request.form.get("follow_up","").strip() or None,
+                    "sales": request.form.get("sales") or 0,
+                    "paid": request.form.get("paid") or 0,
+                    "project_id": request.form.get("project_id") or None,
+                }
+                cloud.update_customer(customer_id, data)
+                return redirect("/customers")
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+        return render_template("edit_customer.html", customer=customer, projects=projects)
 
-    if not session.get("logged_in"):
-        return redirect("/")
+    conn=get_db(); customer=conn.execute("SELECT * FROM customers WHERE id=?",(customer_id,)).fetchone()
+    if not customer: conn.close(); return "Customer not found"
+    if request.method=="POST":
+        conn.execute("""UPDATE customers SET name=?,phone=?,address=?,business=?,notes=?,follow_up=?,sales=?,paid=?,project_id=? WHERE id=?""",
+                     (request.form.get("name"),request.form.get("phone"),request.form.get("address"),request.form.get("business"),
+                      request.form.get("notes"),request.form.get("follow_up"),float(request.form.get("sales") or 0),
+                      float(request.form.get("paid") or 0),request.form.get("project_id") or None,customer_id))
+        conn.commit(); conn.close(); return redirect("/customers")
+    projects=conn.execute("SELECT * FROM projects WHERE status='Active' ORDER BY name").fetchall(); conn.close()
+    return render_template("edit_customer.html", customer=customer, projects=projects)
 
-    conn = get_db()
 
-    customer = conn.execute(
-        "SELECT * FROM customers WHERE id = ?",
-        (customer_id,)
-    ).fetchone()
-
-    if not customer:
-        conn.close()
-        return "Customer not found"
-
-    if request.method == "POST":
-
-        name = request.form.get("name")
-        phone = request.form.get("phone")
-        address = request.form.get("address")
-        business = request.form.get("business")
-        notes = request.form.get("notes")
-        follow_up = request.form.get("follow_up")
-
-        project_id = request.form.get("project_id") or None
-
-        sales = float(request.form.get("sales") or 0)
-        paid = float(request.form.get("paid") or 0)
-
-        conn.execute("""
-                UPDATE customers
-                SET name = ?,
-                phone = ?,
-                address = ?,
-                business = ?,
-                notes = ?,
-                follow_up = ?,
-                sales = ?,
-                paid = ?,
-                project_id = ?
-            WHERE id = ?
-        """, (
-            name,
-            phone,
-            address,
-            business,
-            notes,
-            follow_up,
-            sales,
-            paid,
-            project_id,
-            customer_id
-        ))
-
-        conn.commit()
-        conn.close()
-
-        return redirect("/customers")
-
-    projects = conn.execute("""
-        SELECT *
-        FROM projects
-        WHERE status = 'Active'
-        ORDER BY name
-    """).fetchall()
-
-    conn.close()
-
-    return render_template(
-        "edit_customer.html",
-        customer=customer,
-        projects=projects
-    )
 @app.route("/customer/<int:customer_id>")
 def customer_profile(customer_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    customer = conn.execute("""
-        SELECT customers.*,
-           projects.name AS project_name
-        FROM customers
-        LEFT JOIN projects
-        ON customers.project_id = projects.id
-        WHERE customers.id = ?
-    """, (customer_id,)).fetchone()
-    if not customer:
-        conn.close()
-        return "Customer not found"
-
-    payments = conn.execute("""
-        SELECT *
-        FROM payments
-        WHERE customer_id = ?
-        ORDER BY id ASC
-    """, (customer_id,)).fetchall()
-
-    sales = customer["sales"] or 0
-    running_due = sales
-
-    payment_list = []
-
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            customer = cloud.get_customer(customer_id).get("customer")
+            if not customer: return "Customer not found"
+            return render_template("customer_profile.html", customer=customer,
+                                   due=customer.get("due", (customer.get("sales") or 0)-(customer.get("paid") or 0)),
+                                   payments=customer.get("payments", []))
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db()
+    customer=conn.execute("""SELECT customers.*,projects.name AS project_name FROM customers
+                             LEFT JOIN projects ON customers.project_id=projects.id WHERE customers.id=?""",(customer_id,)).fetchone()
+    if not customer: conn.close(); return "Customer not found"
+    payments=conn.execute("SELECT * FROM payments WHERE customer_id=? ORDER BY id ASC",(customer_id,)).fetchall()
+    sales=customer["sales"] or 0; running_due=sales; payment_list=[]
     for payment in payments:
+        running_due-=payment["amount"]; item=dict(payment); item["due_after_payment"]=running_due; payment_list.append(item)
+    payment_list.reverse(); due=sales-(customer["paid"] or 0); conn.close()
+    return render_template("customer_profile.html",customer=customer,due=due,payments=payment_list)
 
-        running_due -= payment["amount"]
 
-        payment_data = dict(payment)
-        payment_data["due_after_payment"] = running_due
-
-        payment_list.append(payment_data)
-
-    payment_list.reverse()
-
-    due = sales - (customer["paid"] or 0)
-
-    conn.close()
-
-    return render_template(
-        "customer_profile.html",
-        customer=customer,
-        due=due,
-        payments=payment_list
-    )
 @app.route("/add-payment/<int:customer_id>", methods=["GET", "POST"])
 def add_payment(customer_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    customer = conn.execute(
-        "SELECT * FROM customers WHERE id = ?",
-        (customer_id,)
-    ).fetchone()
-
-    if not customer:
-        conn.close()
-        return "Customer not found"
-
-    if request.method == "POST":
-
-        amount = float(request.form.get("amount") or 0)
-        payment_date = request.form.get("payment_date")
-        note = request.form.get("note")
-
-        conn.execute("""
-            INSERT INTO payments
-            (customer_id, amount, payment_date, note)
-            VALUES (?, ?, ?, ?)
-        """, (
-            customer_id,
-            amount,
-            payment_date,
-            note
-        ))
-
-        conn.execute("""
-            UPDATE customers
-            SET paid = paid + ?
-            WHERE id = ?
-        """, (
-            amount,
-            customer_id
-        ))
-
-        conn.commit()
-        conn.close()
-
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            customer = cloud.get_customer(customer_id).get("customer")
+            if not customer: return "Customer not found"
+            if request.method == "POST":
+                amount = float(request.form.get("amount") or 0)
+                cloud.create_payment(customer_id, {"amount": amount, "payment_date": request.form.get("payment_date"), "note": request.form.get("note")})
+                return redirect(f"/customer/{customer_id}")
+            return render_template("add_payment.html", customer=customer)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db(); customer=conn.execute("SELECT * FROM customers WHERE id=?",(customer_id,)).fetchone()
+    if not customer: conn.close(); return "Customer not found"
+    if request.method=="POST":
+        amount=float(request.form.get("amount") or 0)
+        conn.execute("INSERT INTO payments(customer_id,amount,payment_date,note) VALUES(?,?,?,?)",(customer_id,amount,request.form.get("payment_date"),request.form.get("note")))
+        conn.execute("UPDATE customers SET paid=paid+? WHERE id=?",(amount,customer_id)); conn.commit(); conn.close()
         return redirect(f"/customer/{customer_id}")
+    conn.close(); return render_template("add_payment.html",customer=customer)
 
-    conn.close()
 
-    return render_template(
-        "add_payment.html",
-        customer=customer
-    )
 @app.route("/edit-payment/<int:payment_id>", methods=["GET", "POST"])
 def edit_payment(payment_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    payment = conn.execute(
-        "SELECT * FROM payments WHERE id = ?",
-        (payment_id,)
-    ).fetchone()
-
-    if not payment:
-        conn.close()
-        return "Payment not found"
-
-    customer_id = payment["customer_id"]
-
-    if request.method == "POST":
-
-        new_amount = float(request.form.get("amount") or 0)
-        payment_date = request.form.get("payment_date")
-        note = request.form.get("note")
-
-        old_amount = payment["amount"]
-        difference = new_amount - old_amount
-
-        conn.execute("""
-            UPDATE payments
-            SET amount = ?,
-                payment_date = ?,
-                note = ?
-            WHERE id = ?
-        """, (
-            new_amount,
-            payment_date,
-            note,
-            payment_id
-        ))
-
-        conn.execute("""
-            UPDATE customers
-            SET paid = paid + ?
-            WHERE id = ?
-        """, (
-            difference,
-            customer_id
-        ))
-
-        conn.commit()
-        conn.close()
-
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            customer_id = None
+            for customer in cloud.customers():
+                for p in cloud.get_customer(customer["id"]).get("customer",{}).get("payments",[]):
+                    if p["id"] == payment_id: customer_id = customer["id"]; payment = p; break
+                if customer_id: break
+            if not customer_id: return "Payment not found"
+            if request.method=="POST":
+                cloud.update_payment(payment_id, {"amount": float(request.form.get("amount") or 0),
+                    "payment_date": request.form.get("payment_date"), "note": request.form.get("note")})
+                return redirect(f"/customer/{customer_id}")
+            return render_template("edit_payment.html",payment=payment)
+        except CloudAPIError as exc:
+            return "Central CRM error: " + str(exc)
+    conn=get_db(); payment=conn.execute("SELECT * FROM payments WHERE id=?",(payment_id,)).fetchone()
+    if not payment: conn.close(); return "Payment not found"
+    customer_id=payment["customer_id"]
+    if request.method=="POST":
+        new_amount=float(request.form.get("amount") or 0); diff=new_amount-payment["amount"]
+        conn.execute("UPDATE payments SET amount=?,payment_date=?,note=? WHERE id=?",(new_amount,request.form.get("payment_date"),request.form.get("note"),payment_id))
+        conn.execute("UPDATE customers SET paid=paid+? WHERE id=?",(diff,customer_id)); conn.commit(); conn.close()
         return redirect(f"/customer/{customer_id}")
+    conn.close(); return render_template("edit_payment.html",payment=payment)
 
-    conn.close()
 
-    return render_template(
-        "edit_payment.html",
-        payment=payment
-    )
 @app.route("/delete-payment/<int:payment_id>", methods=["GET", "POST"])
 def delete_payment(payment_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    payment = conn.execute(
-        "SELECT * FROM payments WHERE id = ?",
-        (payment_id,)
-    ).fetchone()
-
-    if not payment:
-        conn.close()
-        return "Payment not found"
-
-    customer_id = payment["customer_id"]
-    amount = payment["amount"]
-
-    conn.execute(
-        "DELETE FROM payments WHERE id = ?",
-        (payment_id,)
-    )
-
-    conn.execute("""
-        UPDATE customers
-        SET paid = paid - ?
-        WHERE id = ?
-    """, (
-        amount,
-        customer_id
-    ))
-
-    conn.commit()
-    conn.close()
-
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            customer_id = None
+            for customer in cloud.customers():
+                detail = cloud.get_customer(customer["id"]).get("customer",{})
+                if any(p["id"] == payment_id for p in detail.get("payments",[])):
+                    customer_id = customer["id"]; break
+            if not customer_id: return "Payment not found"
+            cloud.delete_payment(payment_id)
+            return redirect(f"/customer/{customer_id}")
+        except CloudAPIError as exc: return "Central CRM error: " + str(exc)
+    conn=get_db(); payment=conn.execute("SELECT * FROM payments WHERE id=?",(payment_id,)).fetchone()
+    if not payment: conn.close(); return "Payment not found"
+    customer_id=payment["customer_id"]; conn.execute("DELETE FROM payments WHERE id=?",(payment_id,))
+    conn.execute("UPDATE customers SET paid=paid-? WHERE id=?",(payment["amount"],customer_id)); conn.commit(); conn.close()
     return redirect(f"/customer/{customer_id}")
+
+
 @app.route("/delete-customer/<int:customer_id>", methods=["GET", "POST"])
 def delete_customer(customer_id):
-
-    if not session.get("logged_in"):
-        return redirect("/")
-
-    conn = get_db()
-
-    conn.execute(
-        "DELETE FROM customers WHERE id = ?",
-        (customer_id,)
-    )
-
-    conn.commit()
-    conn.close()
-
+    if not session.get("logged_in"): return redirect("/")
+    cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+    if cloud and cloud.enabled:
+        try:
+            cloud.delete_customer(customer_id)
+            return redirect("/customers")
+        except CloudAPIError as exc: return "Central CRM error: " + str(exc)
+    conn=get_db(); conn.execute("DELETE FROM customers WHERE id=?",(customer_id,)); conn.commit(); conn.close()
     return redirect("/customers")
+
+
 @app.route("/receipt-options/<int:payment_id>")
 def receipt_options(payment_id):
 
