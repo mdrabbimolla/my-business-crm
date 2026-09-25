@@ -2977,7 +2977,7 @@ def delete_lead(lead_id):
     if cloud and cloud.enabled:
         try:
             if cloud.me().get("role") != "Admin": return "Access Denied"
-            cloud._request("DELETE", f"/api/leads/{int(lead_id)}")
+            cloud.delete_lead(lead_id)
         except CloudAPIError as exc: return "Central CRM error: " + str(exc)
         return redirect("/leads")
     conn = get_db()
