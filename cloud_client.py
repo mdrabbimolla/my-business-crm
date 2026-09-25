@@ -2,6 +2,12 @@ import json
 import os
 import urllib.error
 import urllib.request
+import ssl
+
+
+def _https_context():
+    return ssl.create_default_context()
+
 
 
 class CloudAPIError(RuntimeError):
