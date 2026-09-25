@@ -430,3 +430,26 @@ class CloudApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+    def test_user_management_is_central(self):
+        self._bootstrap("admin2", "adminpass", "Admin")
+        login = self.client.post("/api/login", json={"username":"admin2","password":"adminpass"})
+        token = login.get_json()["token"]
+        headers={"Authorization":"Bearer "+token}
+        created=self.client.post("/api/users", json={"username":"sales1","password":"secret","name":"Sales One","role":"Sales"}, headers=headers)
+        self.assertEqual(created.status_code, 201)
+        listed=self.client.get("/api/users", headers=headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()["users"][0]["username"], "sales1")
+        user_id=created.get_json()["user_id"]
+        reset=self.client.put(f"/api/users/{user_id}/password", json={"password":"newsecret"}, headers=headers)
+        self.assertEqual(reset.status_code, 200)
+        sales_login=self.client.post("/api/login", json={"username":"sales1","password":"newsecret"})
+        self.assertEqual(sales_login.status_code, 200)
+        sales_token=sales_login.get_json()["token"]
+        denied=self.client.get("/api/users", headers={"Authorization":"Bearer "+sales_token})
+        self.assertEqual(denied.status_code, 403)
+        changed=self.client.put("/api/me/password", json={"current_password":"newsecret","new_password":"finalsecret"}, headers={"Authorization":"Bearer "+sales_token})
+        self.assertEqual(changed.status_code, 200)
+        self.assertEqual(self.client.post("/api/login", json={"username":"sales1","password":"finalsecret"}).status_code, 200)
