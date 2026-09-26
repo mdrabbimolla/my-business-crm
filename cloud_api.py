@@ -243,7 +243,7 @@ def create_user():
              datetime.now(timezone.utc).isoformat()))
         conn.commit()
         row = conn.execute("SELECT id, username, name, role, active, created_at FROM users WHERE id=?", (cur.lastrowid,)).fetchone()
-        return jsonify(user=dict(row)), 201
+        return jsonify(ok=True, user=dict(row), user_id=cur.lastrowid), 201
     except sqlite3.IntegrityError:
         return jsonify(error="username already exists"), 409
     finally:
