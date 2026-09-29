@@ -51,6 +51,16 @@ def test_login_page_and_local_login():
         assert response.status_code == 302
         assert response.headers["Location"].endswith("/")
 
+        # Re-authenticate after the logout regression check before testing
+        # admin-only user management routes.
+        response = client.post(
+            "/",
+            data={"username": "admin", "password": "1234"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/dashboard")
+
         print("ROUTES:", sorted(rule.rule for rule in app_module.app.url_map.iter_rules()))
         response = client.get("/users")
         assert response.status_code == 200
