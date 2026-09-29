@@ -71,21 +71,7 @@ jobs:
               chmod -R u+rwX /tmp/mycrm
               cd /tmp/mycrm &&
               mkdir -p /home/user/.gradle &&
-              printf '%s\n' \
-                'allprojects {' \
-                '  repositories.configureEach { repo ->' \
-                '    if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {' \
-                '      repo.setUrl("https://repo.maven.apache.org/maven2")' \
-                '    }' \
-                '  }' \
-                '}' \
-                'settingsEvaluated { settings ->' \
-                '  settings.pluginManagement.repositories.configureEach { repo ->' \
-                '    if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {' \
-                '      repo.setUrl("https://repo.maven.apache.org/maven2")' \
-                '    }' \
-                '  }' \
-                '}' > /home/user/.gradle/init.gradle
+              cp /tmp/mycrm/gradle-init.gradle /home/user/.gradle/init.gradle &&
               for attempt in 1 2 3; do
                 echo "APK build attempt $attempt/3"
                 if /home/user/app/venv/bin/p4a apk \
