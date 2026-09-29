@@ -70,6 +70,23 @@ jobs:
               cp -a /home/user/crm/. /tmp/mycrm/ &&
               chmod -R u+rwX /tmp/mycrm
               cd /tmp/mycrm &&
+              mkdir -p /home/user/.gradle &&
+              cat > /home/user/.gradle/init.gradle <<'EOF'
+allprojects {
+  repositories.configureEach { repo ->
+    if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {
+      repo.setUrl("https://repo.maven.apache.org/maven2")
+    }
+  }
+}
+settingsEvaluated { settings ->
+  settings.pluginManagement.repositories.configureEach { repo ->
+    if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {
+      repo.setUrl("https://repo.maven.apache.org/maven2")
+    }
+  }
+}
+EOF
               for attempt in 1 2 3; do
                 echo "APK build attempt $attempt/3"
                 if /home/user/app/venv/bin/p4a apk \
