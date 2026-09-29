@@ -773,33 +773,81 @@ def logout():
 def add_user():
     if not session.get("logged_in"):
         return redirect("/")
+
     cloud = _cloud_client(session.get("cloud_token")) if session.get("auth_mode") == "cloud" else None
+
     if cloud and cloud.enabled:
         try:
             me = cloud.me()
             if me.get("user", {}).get("role") != "Admin":
                 return "Access Denied"
+
             if request.method == "POST":
                 data = {
                     "name": request.form.get("name", "").strip(),
                     "username": request.form.get("username", "").strip(),
                     "password": request.form.get("password", "").strip(),
-                    "role": request.form.get("role", "Sales"),
-                    "active": request.form.get("active", "1"),
+                    "role": request.form.get("role", "Sales").strip() or "Sales",
+                    "active": 1 if request.form.get("active", "1") == "1" else 0,
                 }
+                if not data["username"] or not data["password"]:
+                    return "Username and password are required"
                 cloud.create_user(data)
                 return redirect("/users")
+
             return render_template("add_user.html")
         except CloudAPIError as exc:
+            print("CLOUD ADD USER ERROR:", repr(exc))
             return "Central CRM error: " + str(exc)
-    conn=get_db(); current_user=conn.execute("SELECT role FROM users WHERE username=?",(session.get("username"),)).fetchone()
-    if not current_user or current_user["role"]!="Admin": conn.close(); return "Access Denied"
-    if request.method=="POST":
-        name=request.form.get("name","").strip(); username=request.form.get("username","").strip(); password=request.form.get("password","").strip(); role=request.form.get("role","Sales"); active=request.form.get("active","1")
-        if not username or not password: conn.close(); return "Username and password are required"
-        if conn.execute("SELECT id FROM users WHERE username=?",(username,)).fetchone(): conn.close(); return "Username already exists"
-        conn.execute("INSERT INTO users(name,username,password,role,active) VALUES (?,?,?,?,?)",(name,username,password,role,int(active))); conn.commit(); conn.close(); return redirect("/users")
-    conn.close(); return render_template("add_user.html")@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
+        except Exception as exc:
+            print("CLOUD ADD USER UNEXPECTED ERROR:", repr(exc))
+            return "Central CRM error: Unable to create user"
+
+    conn = get_db()
+    try:
+        current_user = conn.execute(
+            "SELECT role FROM users WHERE username=? AND active=1",
+            (session.get("username"),)
+        ).fetchone()
+        if not current_user or current_user["role"] != "Admin":
+            return "Access Denied"
+
+        if request.method == "POST":
+            name = request.form.get("name", "").strip()
+            username = request.form.get("username", "").strip()
+            password = request.form.get("password", "").strip()
+            role = request.form.get("role", "Sales").strip() or "Sales"
+            try:
+                active = int(request.form.get("active", "1"))
+            except (TypeError, ValueError):
+                active = 1
+
+            if not username or not password:
+                return "Username and password are required"
+
+            if conn.execute(
+                "SELECT id FROM users WHERE username=?",
+                (username,)
+            ).fetchone():
+                return "Username already exists"
+
+            conn.execute(
+                "INSERT INTO users(name,username,password,role,active) VALUES (?,?,?,?,?)",
+                (name, username, password, role, active)
+            )
+            conn.commit()
+            return redirect("/users")
+
+        return render_template("add_user.html")
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return "Username already exists"
+    except Exception as exc:
+        conn.rollback()
+        print("LOCAL ADD USER ERROR:", repr(exc))
+        return "Could not create CRM user. Please try again."
+    finally:
+        conn.close()@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
 def reset_password(user_id):
     if not session.get("logged_in"):
         return redirect("/")
