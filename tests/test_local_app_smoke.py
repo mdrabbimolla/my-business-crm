@@ -32,6 +32,26 @@ class LocalAppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"My Business CRM", response.data)
 
+
+    def test_local_add_user(self):
+        client = self.app.test_client()
+        with client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+            session["auth_mode"] = "local"
+        response = client.post("/add-user", data={
+            "name": "Smoke User",
+            "username": "smoke_user",
+            "password": "smoke123",
+            "role": "Sales",
+            "active": "1",
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 302, response.data[:1000])
+        self.assertEqual(response.headers["Location"], "/users")
+        response = client.get("/users")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"smoke_user", response.data)
+
     def test_core_authenticated_pages(self):
         client = self.app.test_client()
         with client.session_transaction() as session:
