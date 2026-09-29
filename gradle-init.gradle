@@ -1,0 +1,14 @@
+allprojects {
+    repositories.configureEach { repo ->
+        if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {
+            repo.setUrl("https://repo.maven.apache.org/maven2")
+        }
+    }
+}
+settingsEvaluated { settings ->
+    settings.pluginManagement.repositories.configureEach { repo ->
+        if (repo.hasProperty("url") && repo.url.toString().contains("maven.aliyun.com")) {
+            repo.setUrl("https://repo.maven.apache.org/maven2")
+        }
+    }
+}
