@@ -52,6 +52,40 @@ class LocalAppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"smoke_user", response.data)
 
+    def test_cloud_add_user_route(self):
+        from unittest.mock import Mock, patch
+
+        client = self.app.test_client()
+        fake_cloud = Mock()
+        fake_cloud.enabled = True
+        fake_cloud.me.return_value = {"user": {"role": "Admin"}}
+        fake_cloud.create_user.return_value = {"ok": True, "user_id": 99}
+
+        with client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+            session["auth_mode"] = "cloud"
+            session["cloud_token"] = "test-token"
+
+        with patch.object(self.app.view_functions["add_user"].__globals__, "_cloud_client", return_value=fake_cloud):
+            response = client.post("/add-user", data={
+                "name": "Cloud Smoke User",
+                "username": "cloud_smoke_user",
+                "password": "cloud123",
+                "role": "Sales",
+                "active": "1",
+            }, follow_redirects=False)
+
+        self.assertEqual(response.status_code, 302, response.data[:1000])
+        self.assertEqual(response.headers["Location"], "/users")
+        fake_cloud.create_user.assert_called_once_with({
+            "name": "Cloud Smoke User",
+            "username": "cloud_smoke_user",
+            "password": "cloud123",
+            "role": "Sales",
+            "active": "1",
+        })
+
     def test_core_authenticated_pages(self):
         client = self.app.test_client()
         with client.session_transaction() as session:
