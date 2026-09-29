@@ -46,6 +46,15 @@ app = Flask(__name__)
 
 app.secret_key = "mycrm-secret-key"
 
+
+@app.after_request
+def _disable_browser_cache(response):
+    # Never replay authenticated CRM pages from Android WebView/browser cache.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 def _https_context():
     """Create the HTTPS context used by update checks and cloud requests."""
     return ssl.create_default_context()
@@ -773,12 +782,30 @@ def change_password():
         if new_password != confirm_password: conn.close(); return "New passwords do not match"
         conn.execute("UPDATE users SET password=? WHERE username=?",(new_password,current_username)); conn.commit(); conn.close()
         return "<h2>✅ Password Changed Successfully!</h2><a href='/dashboard'>⬅ Back to Dashboard</a>"
-    return render_template("change_password.html")@app.route("/logout")
+    return render_template("change_password.html")
+
+@app.route("/logout", methods=["GET", "POST"])
 def logout():
-
+    # Clear every Flask session value, including cloud auth tokens.
+    # Explicitly mark the session modified so Android WebView receives a
+    # fresh expired session cookie instead of retaining the old login.
     session.clear()
+    session.modified = True
 
-    return redirect("/")
+    response = redirect("/", code=303)
+    cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
+    response.delete_cookie(
+        cookie_name,
+        path=app.config.get("SESSION_COOKIE_PATH", "/"),
+        domain=app.config.get("SESSION_COOKIE_DOMAIN") or None,
+        secure=app.config.get("SESSION_COOKIE_SECURE", False),
+        httponly=app.config.get("SESSION_COOKIE_HTTPONLY", True),
+        samesite=app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
+    )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.route("/add-user", methods=["GET", "POST"])
 def add_user():
