@@ -847,14 +847,17 @@ def add_user():
 
         return render_template("add_user.html")
     except sqlite3.IntegrityError:
-        conn.rollback()
+        if conn is not None:
+            conn.rollback()
         return "Username already exists"
     except Exception as exc:
-        conn.rollback()
+        if conn is not None:
+            conn.rollback()
         print("LOCAL ADD USER ERROR:", repr(exc))
         return "Could not create CRM user. Please try again."
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 @app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
