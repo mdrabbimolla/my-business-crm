@@ -33,6 +33,33 @@ class LocalAppSmokeTest(unittest.TestCase):
         self.assertIn(b"My Business CRM", response.data)
 
 
+    def test_legacy_database_user_migration_and_add_user(self):
+        import sqlite3
+        import database
+        legacy_path = os.path.join(self.tmpdir.name, "legacy.db")
+        conn = sqlite3.connect(legacy_path)
+        conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password TEXT NOT NULL)")
+        conn.execute("INSERT INTO users(username,password) VALUES('admin','1234')")
+        conn.commit(); conn.close()
+        database.DATABASE = legacy_path
+        database.init_db()
+        client = self.app.test_client()
+        with client.session_transaction() as session:
+            session["logged_in"] = True
+            session["username"] = "admin"
+            session["auth_mode"] = "local"
+        response = client.post("/add-user", data={
+            "name": "Legacy Smoke User", "username": "legacy_user",
+            "password": "legacy123", "role": "Sales", "active": "1",
+        }, follow_redirects=False)
+        self.assertEqual(response.status_code, 302, response.data[:1000])
+        self.assertEqual(response.headers["Location"], "/users")
+        response = client.get("/users")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"legacy_user", response.data)
+        database.DATABASE = os.path.join(self.tmpdir.name, "database.db")
+        database.init_db()
+
     def test_local_add_user(self):
         client = self.app.test_client()
         with client.session_transaction() as session:
