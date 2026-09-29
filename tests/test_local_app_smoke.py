@@ -110,7 +110,7 @@ class LocalAppSmokeTest(unittest.TestCase):
             "username": "cloud_smoke_user",
             "password": "cloud123",
             "role": "Sales",
-            "active": "1",
+            "active": 1,
         })
 
     def test_core_authenticated_pages(self):
