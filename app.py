@@ -88,14 +88,20 @@ def crm_users_page():
             return render_template("users.html", users=cloud.users())
         except CloudAPIError as exc:
             return "Central CRM error: " + str(exc)
-    conn = get_db()
-    current_user = conn.execute("SELECT role FROM users WHERE username=? AND active=1", (session.get("username"),)).fetchone()
-    if not current_user or current_user["role"] != "Admin":
-        conn.close()
-        return "Access Denied"
-    users = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
-    conn.close()
-    return render_template("users.html", users=users)
+    conn = None
+    try:
+        conn = get_db()
+        current_user = conn.execute("SELECT role FROM users WHERE username=? AND active=1", (session.get("username"),)).fetchone()
+        if not current_user or current_user["role"] != "Admin":
+            return "Access Denied"
+        users = conn.execute("SELECT * FROM users ORDER BY id DESC").fetchall()
+        return render_template("users.html", users=users)
+    except Exception as exc:
+        print("CRM USERS PAGE ERROR:", repr(exc))
+        return "CRM Users error: Please retry. The local database could not be opened."
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def _sync_cloud_user_to_local(user, password):
