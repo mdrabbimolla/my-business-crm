@@ -50,7 +50,7 @@ class LocalAppSmokeTest(unittest.TestCase):
             session["auth_mode"] = "local"
         response = client.post("/add-user", data={
             "name": "Legacy Smoke User", "username": "legacy_user",
-            "password": "legacy123", "role": "Sales", "active": "1",
+            "password": "legacy123", "role": "Sales", "active": 1,
         }, follow_redirects=False)
         self.assertEqual(response.status_code, 302, response.data[:1000])
         self.assertEqual(response.headers["Location"], "/users")
