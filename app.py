@@ -87,7 +87,11 @@ def crm_users_page():
                 return "Access Denied"
             return render_template("users.html", users=cloud.users())
         except CloudAPIError as exc:
+            print("CRM USERS CLOUD ERROR:", repr(exc))
             return "Central CRM error: " + str(exc)
+        except Exception as exc:
+            print("CRM USERS CLOUD UNEXPECTED ERROR:", repr(exc))
+            return "Central CRM error: Unable to load users"
     conn = None
     try:
         conn = get_db()
