@@ -100,7 +100,7 @@ class LocalAppSmokeTest(unittest.TestCase):
                 "username": "cloud_smoke_user",
                 "password": "cloud123",
                 "role": "Sales",
-                "active": "1",
+                "active": 1,
             }, follow_redirects=False)
 
         self.assertEqual(response.status_code, 302, response.data[:1000])
