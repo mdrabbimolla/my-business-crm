@@ -809,8 +809,9 @@ def add_user():
             print("CLOUD ADD USER UNEXPECTED ERROR:", repr(exc))
             return "Central CRM error: Unable to create user"
 
-    conn = get_db()
+    conn = None
     try:
+        conn = get_db()
         current_user = conn.execute(
             "SELECT role FROM users WHERE username=? AND active=1",
             (session.get("username"),)
