@@ -398,6 +398,8 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/expenses",headers=headers).json["total_expenses"],0)
 
     def test_dashboard_and_reports_are_central(self):
+        from datetime import date
+        report_date = date.today().isoformat()
         response = self.client.post("/api/bootstrap-user",
             json={"username":"dashboard-admin","password":"pass-123","name":"Dashboard Admin","role":"Admin"},
             headers={"X-CRM-API-SECRET":"test-secret"})
@@ -419,23 +421,23 @@ class CloudApiTests(unittest.TestCase):
 
         lead = self.client.post("/api/leads", json={
             "name":"Dashboard Lead","phone":"01833333333","project_id":project_id,
-            "visit_date":"2026-09-25","follow_up_date":"2026-09-25"
+            "visit_date":report_date,"follow_up_date":report_date
         }, headers=headers)
         self.assertEqual(lead.status_code, 201)
 
         followup = self.client.post("/api/followups", json={
             "lead_id":lead.json["lead"]["id"],"name":"Dashboard Lead","phone":"01833333333",
-            "follow_up_date":"2026-09-25","note":"Today","status":"New"
+            "follow_up_date":report_date,"note":"Today","status":"New"
         }, headers=headers)
         self.assertEqual(followup.status_code, 201)
 
         payment = self.client.post(f"/api/customers/{customer_id}/payments",
-            json={"amount":25000,"payment_date":"2026-09-25","note":"Paid"},
+            json={"amount":25000,"payment_date":report_date,"note":"Paid"},
             headers=headers)
         self.assertEqual(payment.status_code, 201)
 
         expense = self.client.post("/api/expenses",
-            json={"amount":5000,"expense_date":"2026-09-25","category":"Office","note":"Expense"},
+            json={"amount":5000,"expense_date":report_date,"category":"Office","note":"Expense"},
             headers=headers)
         self.assertEqual(expense.status_code, 201)
 
