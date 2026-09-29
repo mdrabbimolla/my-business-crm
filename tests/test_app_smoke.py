@@ -39,6 +39,18 @@ def test_login_page_and_local_login():
         response = client.get("/dashboard")
         assert response.status_code == 200
 
+        # Logout must invalidate the authenticated session and prevent the
+        # Android/WebView from replaying a cached dashboard.
+        response = client.get("/logout", follow_redirects=False)
+        assert response.status_code == 303
+        assert response.headers["Location"].endswith("/")
+        assert "session=" in response.headers.get("Set-Cookie", "")
+        assert "no-store" in response.headers.get("Cache-Control", "")
+
+        response = client.get("/dashboard", follow_redirects=False)
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/")
+
         print("ROUTES:", sorted(rule.rule for rule in app_module.app.url_map.iter_rules()))
         response = client.get("/users")
         assert response.status_code == 200
