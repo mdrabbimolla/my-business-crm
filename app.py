@@ -847,7 +847,10 @@ def add_user():
         print("LOCAL ADD USER ERROR:", repr(exc))
         return "Could not create CRM user. Please try again."
     finally:
-        conn.close()@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
+        conn.close()
+
+
+@app.route("/reset-password/<int:user_id>", methods=["GET", "POST"])
 def reset_password(user_id):
     if not session.get("logged_in"):
         return redirect("/")
