@@ -67,6 +67,30 @@ def test_login_page_and_local_login():
         response = client.get("/users")
         assert response.status_code == 200
         assert b"testsales" in response.data
+
+        # Admin password reset must actually change the stored credential.
+        reset_page = client.get("/reset-password/2")
+        assert reset_page.status_code == 200
+        assert b"testsales" in reset_page.data
+
+        response = client.post(
+            "/reset-password/2",
+            data={"new_password": "reset456", "confirm_password": "reset456"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/users")
+
+        # Verify the reset password works for the affected user.
+        with client.session_transaction() as sess:
+            sess.clear()
+        response = client.post(
+            "/",
+            data={"username": "testsales", "password": "reset456"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/dashboard")
     finally:
         try:
             os.remove(db_file)
