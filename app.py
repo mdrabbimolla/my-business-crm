@@ -91,6 +91,7 @@ def crm_users_page():
     conn = None
     try:
         conn = get_db()
+        ensure_user_schema(conn)
         current_user = conn.execute("SELECT role FROM users WHERE username=? AND active=1", (session.get("username"),)).fetchone()
         if not current_user or current_user["role"] != "Admin":
             return "Access Denied"
