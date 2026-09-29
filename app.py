@@ -768,8 +768,17 @@ def change_password():
                 return "New passwords do not match"
             try:
                 cloud.change_my_password(current_password, new_password)
+                # Keep the local fallback credential in sync with Central CRM.
+                _sync_cloud_user_to_local(
+                    cloud.me().get("user") or {"username": session.get("username")},
+                    new_password,
+                )
             except CloudAPIError as exc:
+                print("CLOUD CHANGE PASSWORD ERROR:", repr(exc))
                 return "Central CRM error: " + str(exc)
+            except Exception as exc:
+                print("LOCAL PASSWORD SYNC ERROR:", repr(exc))
+                return "Password changed in Central CRM, but local sync failed. Please retry login."
             return "<h2>✅ Password Changed Successfully!</h2><a href='/dashboard'>⬅ Back to Dashboard</a>"
         return render_template("change_password.html")
     if request.method == "POST":
@@ -907,17 +916,43 @@ def reset_password(user_id):
             if request.method=="POST":
                 new_password=request.form.get("new_password","").strip(); confirm_password=request.form.get("confirm_password","").strip()
                 if not new_password or new_password!=confirm_password: return "Password is empty or passwords do not match"
-                cloud.reset_user_password(user_id,new_password); return redirect("/users")
+                cloud.reset_user_password(user_id,new_password)
+                # Mirror the new password locally so cloud->local fallback cannot
+                # resurrect the old credential on Android.
+                conn = get_db()
+                try:
+                    conn.execute("UPDATE users SET password=? WHERE username=?", (new_password, user.get("username")))
+                    conn.commit()
+                finally:
+                    conn.close()
+                return redirect("/users")
             return render_template("reset_password.html", user=user)
-        except CloudAPIError as exc: return "Central CRM error: "+str(exc)
-    conn=get_db(); admin=conn.execute("SELECT role FROM users WHERE username=? AND active=1",(session.get("username"),)).fetchone(); user=conn.execute("SELECT * FROM users WHERE id=?",(user_id,)).fetchone()
-    if not admin or admin["role"]!="Admin": conn.close(); return "Access Denied"
-    if not user: conn.close(); return "User not found"
-    if request.method=="POST":
-        new_password=request.form.get("new_password","").strip(); confirm_password=request.form.get("confirm_password","").strip()
-        if not new_password or new_password!=confirm_password: conn.close(); return "Password is empty or passwords do not match"
-        conn.execute("UPDATE users SET password=? WHERE id=?",(new_password,user_id)); conn.commit(); conn.close(); return redirect("/users")
-    conn.close(); return render_template("reset_password.html", user=user)@app.route("/users")
+        except CloudAPIError as exc:
+            print("CLOUD RESET PASSWORD ERROR:", repr(exc))
+            return "Central CRM error: " + str(exc)
+        except Exception as exc:
+            print("CLOUD RESET PASSWORD UNEXPECTED ERROR:", repr(exc))
+            return "Password reset failed. Please retry."
+    conn=get_db()
+    try:
+        ensure_user_schema(conn)
+        admin=conn.execute("SELECT role FROM users WHERE username=? AND active=1",(session.get("username"),)).fetchone()
+        user=conn.execute("SELECT * FROM users WHERE id=?",(user_id,)).fetchone()
+        if not admin or admin["role"]!="Admin": return "Access Denied"
+        if not user: return "User not found"
+        if request.method=="POST":
+            new_password=request.form.get("new_password","").strip()
+            confirm_password=request.form.get("confirm_password","").strip()
+            if not new_password or new_password!=confirm_password:
+                return "Password is empty or passwords do not match"
+            conn.execute("UPDATE users SET password=? WHERE id=?",(new_password,user_id))
+            conn.commit()
+            return redirect("/users")
+        return render_template("reset_password.html", user=user)
+    finally:
+        conn.close()
+
+@app.route("/users")
 def users():
     if not session.get("logged_in"):
         return redirect("/")
