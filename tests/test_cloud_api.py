@@ -448,7 +448,7 @@ class CloudApiTests(unittest.TestCase):
         self.assertEqual(dashboard.json["today_followup_count"], 1)
         self.assertEqual(dashboard.json["visit_count"], 1)
 
-        report = self.client.get("/api/reports?payment_date=2026-09-25&expense_date=2026-09-25", headers=headers)
+        report = self.client.get("/api/reports?payment_date={report_date}&expense_date={report_date}", headers=headers)
         self.assertEqual(report.status_code, 200)
         self.assertEqual(report.json["total_sales"], 100000)
         self.assertEqual(report.json["total_paid"], 50000)
