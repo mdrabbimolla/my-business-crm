@@ -67,7 +67,7 @@ class LocalAppSmokeTest(unittest.TestCase):
             session["auth_mode"] = "cloud"
             session["cloud_token"] = "test-token"
 
-        with patch.object(self.app.view_functions["add_user"].__globals__, "_cloud_client", return_value=fake_cloud):
+        with patch("app._cloud_client", return_value=fake_cloud):
             response = client.post("/add-user", data={
                 "name": "Cloud Smoke User",
                 "username": "cloud_smoke_user",
