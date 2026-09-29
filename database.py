@@ -19,6 +19,33 @@ def _database_path():
 DATABASE = _database_path()
 
 
+def ensure_user_schema(conn):
+    """Ensure the CRM user table and management columns exist on every request."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
+    """)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    for column, definition in (
+        ("name", "TEXT"),
+        ("role", "TEXT DEFAULT 'Sales'"),
+        ("active", "INTEGER DEFAULT 1"),
+    ):
+        if column not in columns:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {column} {definition}")
+    conn.execute("UPDATE users SET role='Admin', active=1 WHERE username='admin'")
+    row = conn.execute("SELECT id FROM users WHERE username='admin'").fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO users(username,password,name,role,active) VALUES(?,?,?,?,?)",
+            ("admin", "1234", "Administrator", "Admin", 1),
+        )
+    conn.commit()
+
+
 def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
