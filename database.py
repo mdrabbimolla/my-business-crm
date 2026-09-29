@@ -193,6 +193,9 @@ def init_db():
     add_column_if_missing("users", "role", "TEXT DEFAULT 'Sales'")
     add_column_if_missing("users", "active", "INTEGER DEFAULT 1")
 
+    # Keep the built-in admin account as Admin when upgrading old databases.
+    conn.execute("UPDATE users SET role = ?, active = 1 WHERE username = ?", ("Admin", "admin"))
+
     existing_user = conn.execute(
         "SELECT id FROM users WHERE username = ?",
         ("admin",)
