@@ -14,7 +14,7 @@ import ssl
 import threading
 from flask import Flask, request, redirect, session, render_template, send_file
 from werkzeug.utils import secure_filename
-from database import get_db, init_db
+from database import get_db, init_db, ensure_user_schema
 from cloud_client import CloudCRMClient, CloudAPIError
 
 try:
@@ -812,6 +812,7 @@ def add_user():
     conn = None
     try:
         conn = get_db()
+        ensure_user_schema(conn)
         current_user = conn.execute(
             "SELECT role FROM users WHERE username=? AND active=1",
             (session.get("username"),)
